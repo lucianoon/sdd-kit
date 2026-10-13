@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sdd-kit"
+name = "sdd-kit-ai"
 version = "0.11.0"
 description = "SDD agnóstico: especificações como contrato, verificação fora do LLM."
 readme = "README.md"

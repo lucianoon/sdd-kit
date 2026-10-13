@@ -1,0 +1,33 @@
+# Publicação sem manual: tag `v*` builda e publica no PyPI (trusted publishing).
+# Configurar UMA vez no PyPI (Settings → Publishing → Add new pending publisher):
+#   PyPI project name: sdd-kit-ai
+#   Owner: lucianoon · Repository: sdd-kit · Workflow: release.yml · Environment: pypi
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12" }
+      - run: pip install -U build twine
+      - run: python -m build
+      # Falha antes de publicar com metadados quebrados (licença, readme, name...).
+      - run: twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with: { name: dist, path: dist/ }
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # OIDC do trusted publishing; sem segredo no repo
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
+      - uses: pypa/gh-action-pypi-publish@release/v1

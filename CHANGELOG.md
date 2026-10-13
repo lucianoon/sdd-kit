@@ -4,6 +4,25 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 [SemVer](https://semver.org/lang/pt-BR/). Versão 0.x: minor pode mudar comportamento
 observável; mudanças que quebram projetos que adotam o kit explicam a migração.
 
+## [Não publicado]
+
+### Adicionado
+
+- Workflow de release por tag (`v*`): build + `twine check` + publicação no PyPI
+  via trusted publishing (sem segredo no repo). Requer configurar o *pending publisher*
+  uma vez no PyPI: projeto `sdd-kit-ai`, repo `lucianoon/sdd-kit`, workflow `release.yml`.
+- Exemplo `examples/multi/`: duas specs independentes (`pedidos`, `fretes`) com código
+  realmente acoplado (o frete literalmente importa o limite VIP dos pedidos), paths
+  próprios por feature e IDs únicos entre specs — exercita a regra de dono por feature.
+- README com seção dedicada às aplicações de agentes de IA (12 módulos, 61 requisitos,
+  LGPD/PL 2338) e à instalação pelo PyPI.
+
+### Modificado
+
+- Nome do pacote no PyPI: `sdd-kit` → **`sdd-kit-ai`** — o nome antigo está ocupado no
+  PyPI por outro projeto (VS Code/Copilot). O comando `sdd`, o módulo `sdd` e a
+  instalação pela fonte continuam iguais.
+
 ## [0.11.0] — 2026-10-13
 
 ### Adicionado
