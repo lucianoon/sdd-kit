@@ -213,6 +213,80 @@ requirements:
         given: um dataset com menos casos que min_cases
         when: as specs são carregadas
         then: o tamanho insuficiente é reportado como erro
+      - id: AC-055
+        given: um harness de eval que excede o timeout
+        when: sdd eval roda
+        then: o eval reprova com código -1 em vez de travar
+  - id: REQ-012
+    description: Tornar regras de dependência entre camadas executáveis.
+    acceptance:
+      - id: AC-043
+        given: um arquivo sujeito a uma regra que importa um módulo proibido
+        when: sdd check ou sdd arch roda
+        then: a violação é reportada com regra, arquivo, linha e import, sem falso positivo por prefixo
+      - id: AC-044
+        given: um import relativo que alcança um caminho proibido
+        when: sdd arch roda
+        then: a violação é reportada
+      - id: AC-045
+        given: imports em JS/TS (from, require, import dinâmico, multilinha) e Go (simples e em bloco)
+        when: sdd arch roda
+        then: todos são reconhecidos
+      - id: AC-046
+        given: uma marcação sdd allow na linha do import
+        when: sdd arch roda
+        then: com motivo e regra certa vira exceção registrada; sem motivo ou com outra regra, continua violação
+      - id: AC-047
+        given: uma regra cujo glob não casa nenhum arquivo
+        when: sdd arch roda
+        then: o arch reprova em vez de aprovar em silêncio
+      - id: AC-048
+        given: imports dentro de comentários ou docstrings
+        when: sdd arch roda
+        then: eles não contam
+      - id: AC-058
+        given: aspas triplas dentro de uma string comum num arquivo Python
+        when: sdd arch ou sdd mutate leem o arquivo
+        then: o restante do arquivo continua sendo analisado
+  - id: REQ-013
+    description: Exigir modos de falha declarados e testados para dependências externas.
+    acceptance:
+      - id: AC-049
+        given: uma dependência sem timeout, retry ou fallback
+        when: as specs são carregadas
+        then: os campos ausentes são reportados como erro
+      - id: AC-050
+        given: retry em operação com efeito colateral e não idempotente
+        when: as specs são carregadas
+        then: o risco de transação duplicada é reportado como erro
+      - id: AC-051
+        given: covered_by apontando para um ID inexistente na spec
+        when: as specs são carregadas
+        then: a referência é reportada como erro
+      - id: AC-052
+        given: um design sem a lista dependencies
+        when: as specs são carregadas
+        then: a ausência é erro, e a lista vazia explícita é aceita
+      - id: AC-053
+        given: uma suíte de testes que excede tests.timeout
+        when: sdd check roda
+        then: o check reprova informando o timeout em vez de travar
+      - id: AC-054
+        given: uma falha do git, como base inexistente
+        when: sdd diff roda
+        then: o diff sai com código 2 e a mensagem do git
+      - id: AC-056
+        given: um mutante que faz os testes travarem
+        when: sdd mutate roda
+        then: o mutante conta como morto por timeout
+      - id: AC-057
+        given: uma mutação que não altera o tamanho do arquivo
+        when: sdd mutate roda
+        then: os testes rodam sem bytecode em cache e cada escrita recebe um mtime novo
+      - id: AC-059
+        given: um comando que estoura o timeout e tem processos filhos
+        when: o kit encerra o comando
+        then: a árvore inteira de processos morre, sem órfãos consumindo CPU
 
 design:
   numbers:
@@ -273,6 +347,18 @@ design:
       mitigated_by: [AC-037, AC-040]
     - area: data_integrity
       severity: high
+      description: mutante falso sobrevivente por cache de bytecode, desacreditando a mutação
+      mitigated_by: [AC-057]
+    - area: availability
+      severity: medium
+      description: comando externo travado pendura o CI ou vaza processos órfãos
+      mitigated_by: [AC-053, AC-055, AC-056, AC-059]
+    - area: other
+      severity: medium
+      description: motor acoplado à CLI impede uso como biblioteca e testes isolados
+      mitigated_by: [ARCH-001, ARCH-002]
+    - area: data_integrity
+      severity: high
       description: aprovar com JUnit velho de uma execução anterior
       mitigated_by: [AC-021]
     - area: security
@@ -283,6 +369,39 @@ design:
       severity: low
       description: validação lenta em monorepos com muitas specs
       mitigated_by: [NFR-001]
+  dependencies:
+    - name: runner de testes do projeto
+      kind: process
+      timeout_ms: 3600000
+      retry: {max_attempts: 1, backoff: none}
+      fallback: "nenhum: o check reprova informando o timeout"
+      side_effects: false
+      idempotent: true
+      covered_by: [AC-053, AC-021]
+    - name: git
+      kind: process
+      timeout_ms: 60000
+      retry: {max_attempts: 1, backoff: none}
+      fallback: "nenhum: o diff sai com código 2 e a mensagem do git"
+      side_effects: false
+      idempotent: true
+      covered_by: [AC-054]
+    - name: harness de evals
+      kind: process
+      timeout_ms: 3600000
+      retry: {max_attempts: 1, backoff: none}
+      fallback: "nenhum: o eval reprova; retry mascararia instabilidade do agente"
+      side_effects: false
+      idempotent: false
+      covered_by: [AC-055, AC-039]
+    - name: suíte de testes sob mutação
+      kind: process
+      timeout_ms: 120000
+      retry: {max_attempts: 1, backoff: none}
+      fallback: "timeout conta como mutante morto"
+      side_effects: false
+      idempotent: true
+      covered_by: [AC-056, AC-032]
 
 invariants:
   - Nenhuma decisão de aprovação depende de um LLM

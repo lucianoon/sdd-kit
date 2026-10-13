@@ -225,7 +225,7 @@ def test_harness_quebrado_via_cli_guarda_final_da_saida(tmp_path):
     assert len(saved["output"]) == 4000 and saved["output"].rstrip().endswith("CAUSA")
 
 
-def test_harness_que_estoura_timeout(tmp_path):
+def test_ac_055_harness_que_estoura_timeout(tmp_path):
     project(tmp_path)
     cfg_file = tmp_path / "specs/sdd.yaml"
     cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))

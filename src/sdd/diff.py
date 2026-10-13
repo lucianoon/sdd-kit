@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .core import Project
 
+GIT_TIMEOUT = 60  # segundos
 TRAILER = re.compile(r"^SDD-No-Spec-Change:[ \t]*(.+)$", re.MULTILINE)
 
 
@@ -39,8 +40,11 @@ def matches(path: str, patterns: list[str]) -> bool:
 
 
 def _git(root: Path, *args: str) -> str:
-    p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
+    try:
+        p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        raise GitError(f"git {' '.join(args)}: excedeu {GIT_TIMEOUT}s")
     if p.returncode != 0:
         raise GitError(f"git {' '.join(args)}: {p.stderr.strip()}")
     return p.stdout

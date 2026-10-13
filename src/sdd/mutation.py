@@ -9,13 +9,15 @@ from __future__ import annotations
 import os
 import re
 import shutil
-import subprocess
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .core import Project
 from .diff import matches
+from .procs import run_shell
+from .textscan import python_string_lines
 
 # (nome, padrão, substituição). Lookarounds evitam ->, =>, <<, ++, +=, etc.
 OPERATORS: list[tuple[str, re.Pattern, str]] = [
@@ -120,14 +122,11 @@ def candidates(root: Path, files: list[str]) -> list[Mutant]:
             lines = (root / rel).read_text(encoding="utf-8").splitlines()
         except (UnicodeDecodeError, FileNotFoundError):
             continue
-        in_docstring = False
+        in_string = (python_string_lines("\n".join(lines) + "\n")
+                     if rel.endswith(".py") else set())
         for n, line in enumerate(lines, 1):
             s = line.strip()
-            # docstrings Python de várias linhas
-            if s.count('"""') % 2 == 1 or s.count("'''") % 2 == 1:
-                in_docstring = not in_docstring
-                continue
-            if in_docstring or not s or s.startswith(COMMENT_STARTS) or SKIP_MARK in line:
+            if n in in_string or not s or s.startswith(COMMENT_STARTS) or SKIP_MARK in line:
                 continue
             if s.startswith(("import ", "from ", "#include", "package ", "using ")):
                 continue
@@ -162,12 +161,34 @@ def _copy_project(root: Path, link: list[str]) -> Path:
     return dest
 
 
+class _Clock:
+    """mtimes estritamente crescentes: toda escrita invalida caches baseados em data."""
+
+    def __init__(self):
+        self.t = time.time()
+
+    def next(self) -> float:
+        self.t = max(self.t + 2, time.time())
+        return self.t
+
+
+def _read(path: Path) -> str:
+    with open(path, encoding="utf-8", newline="") as f:  # preserva \r\n exatamente
+        return f.read()
+
+
+def _write(path: Path, text: str, clock: _Clock) -> None:
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+    t = clock.next()
+    os.utime(path, (t, t))
+
+
 def _run(cmd: str, cwd: Path, env: dict, timeout: int) -> str:
-    try:
-        p = subprocess.run(cmd, shell=True, cwd=cwd, env=env, capture_output=True, timeout=timeout)
-        return "passed" if p.returncode == 0 else "failed"
-    except subprocess.TimeoutExpired:
+    r = run_shell(cmd, cwd, timeout, env)
+    if r.timed_out:
         return "timeout"
+    return "passed" if r.returncode == 0 else "failed"
 
 
 def feature_files(proj: Project, spec, only: set[str] | None = None) -> list[str]:
@@ -199,23 +220,27 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
 
     cmd = cfg.command or proj.config.tests.command
     work = _copy_project(proj.root, cfg.link)
+    clock = _Clock()
     try:
         env = {**os.environ, **{k: v.replace("{root}", str(work)) for k, v in cfg.env.items()}}
+        # Bytecode em cache faria o Python rodar o código antigo quando a mutação não muda o
+        # tamanho do arquivo (ex.: + → -) e ocorre no mesmo segundo: falso sobrevivente.
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
         if _run(cmd, work, env, cfg.timeout) != "passed":
             rep.error = "a suíte não passa sem mutações; corrija os testes antes de medir"
             rep.mutants = []
             return rep
         for m in rep.mutants:
             target = work / m.file
-            original = target.read_text(encoding="utf-8")
+            original = _read(target)
             lines = original.splitlines(keepends=True)
             nl = lines[m.line - 1][len(lines[m.line - 1].rstrip("\r\n")):]
             lines[m.line - 1] = m.mutated + nl
-            target.write_text("".join(lines), encoding="utf-8")
+            _write(target, "".join(lines), clock)
             try:
                 result = _run(cmd, work, env, cfg.timeout)
             finally:
-                target.write_text(original, encoding="utf-8")
+                _write(target, original, clock)
             m.status = {"failed": "killed", "passed": "survived", "timeout": "timeout"}[result]
             if on_result:
                 on_result(m)

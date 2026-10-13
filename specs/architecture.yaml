@@ -1,0 +1,19 @@
+rules:
+  - id: ARCH-001
+    description: O motor de verificação não depende da CLI (usável como biblioteca)
+    from:
+      - src/sdd/core.py
+      - src/sdd/models.py
+      - src/sdd/diff.py
+      - src/sdd/arch.py
+      - src/sdd/evals.py
+      - src/sdd/mutation.py
+      - src/sdd/procs.py
+      - src/sdd/textscan.py
+    forbid: [typer, click]
+    forbid_paths: [src/sdd/cli]
+  - id: ARCH-002
+    description: O schema só descreve; não executa comandos nem conhece o motor
+    from: [src/sdd/models.py]
+    forbid: [subprocess, shutil, typer]
+    forbid_paths: [src/sdd/core, src/sdd/diff, src/sdd/arch, src/sdd/evals, src/sdd/mutation]

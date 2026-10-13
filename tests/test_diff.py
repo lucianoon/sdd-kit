@@ -116,7 +116,7 @@ def test_arquivo_fora_de_code_e_ignorado(repo):
     assert run_diff(repo).exit_code == 0
 
 
-def test_base_inexistente_sai_com_2(repo):
+def test_ac_054_falha_do_git_sai_com_2(repo):
     r = runner.invoke(app, ["diff", "--base", "nao-existe", "-C", str(repo)])
     assert r.exit_code == 2
 

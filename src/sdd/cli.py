@@ -151,6 +151,28 @@ def mutate(
     raise typer.Exit(0 if ok else 1)
 
 
+@app.command(name="arch")
+def arch_cmd(root: Path = Root):
+    """Verifica só as regras de arquitetura (specs/architecture.yaml). Rápido, sem testes."""
+    from . import arch
+
+    proj = _load_or_exit(root)
+    rep = arch.check(proj)
+    if not rep["rules"]:
+        typer.echo("nenhuma regra em specs/architecture.yaml")
+        raise typer.Exit(0)
+    for e in rep["exceptions"]:
+        typer.echo(f"EXCEÇÃO {e['rule']}  {e['file']}:{e['line']}  {e['import']}  ({e['reason']})")
+    for v in rep["violations"]:
+        extra = f"  [{v['detail']}]" if v.get("detail") else ""
+        typer.echo(f"ERRO  {v['rule']}  {v['file']}:{v['line']}  importa '{v['import']}'{extra}", err=True)
+    for p in rep["problems"]:
+        typer.echo(f"ERRO  {p}", err=True)
+    typer.echo(f"\n{len(rep['rules'])} regra(s), {rep['files']} arquivo(s) — "
+               f"{'APROVADO' if rep['ok'] else 'REPROVADO'}")
+    raise typer.Exit(0 if rep["ok"] else 1)
+
+
 @app.command(name="eval")
 def eval_cmd(root: Path = Root):
     """Roda o harness de evals e aplica os critérios estatísticos (EVAL-NNN).

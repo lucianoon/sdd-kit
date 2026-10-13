@@ -24,6 +24,7 @@ sdd check       # roda testes + gates; exit 1 se algum AC/NFR não tiver teste p
 sdd diff        # exit 1 se código de uma feature mudou sem a spec mudar junto
 sdd mutate      # exit 1 se os testes não detectam código errado (score < mínimo)
 sdd eval        # exit 1 se o comportamento do LLM não atinge os critérios estatísticos
+sdd arch        # exit 1 se uma camada importa o que não pode (também roda no check)
 sdd schema      # JSON Schema da spec (autocomplete no editor, outras ferramentas)
 ```
 
@@ -247,6 +248,72 @@ Para mutação mais profunda, ferramentas dedicadas (mutmut, Stryker, pitest, ca
 entram como `gates` comuns; o `mutate` embutido existe para funcionar em qualquer stack sem
 instalar nada.
 
+## Arquitetura executável: `specs/architecture.yaml`
+
+"Domínio não depende de infraestrutura" escrito num documento não impede ninguém, humano
+ou agente, de dar `import openai` dentro da regra de negócio. Aqui a regra é verificada:
+
+```yaml
+rules:
+  - id: ARCH-001
+    description: Domínio não depende de infraestrutura nem de provedores de IA
+    from: ["src/domain/**"]
+    forbid: [openai, anthropic, "langchain*", "langgraph*", "@langchain/*", redis, sqlalchemy]
+    forbid_paths: ["src/adapters/**", "src/infra/**"]   # alcançados por import relativo
+```
+
+```
+$ sdd arch
+ERRO  ARCH-001  src/domain/pedido.py:3  importa 'openai'
+1 regra(s), 14 arquivo(s) — REPROVADO
+```
+
+- Lê imports de **Python** (`import`, `from`, relativos), **JS/TS** (`from`, `require`,
+  `import()`, multilinha, ESM com extensão) e **Go** (simples e em bloco). Comentários e
+  strings longas não contam (o Python é lido com o tokenizador da própria linguagem).
+- `forbid` casa módulos e subcaminhos (`openai` pega `openai.types` e `openai/resources`,
+  mas não `openai_helpers`); aceita curingas.
+- Regra cujo `from` não casa nenhum arquivo **reprova**: glob errado não pode virar
+  "aprovado em silêncio".
+- Exceção pontual, auditável, na linha do import:
+  `import openai  # sdd: allow ARCH-001 adapter legado até a AD-007`. Sem motivo não vale;
+  as exceções aparecem no relatório.
+- Riscos do `design` podem apontar para regras (`mitigated_by: [ARCH-001]`); o relatório
+  mostra se a regra está `OK` ou `VIOLADA`.
+- Roda dentro do `sdd check`. Para outras linguagens ou regras mais ricas (ciclos, camadas
+  transitivas), use ArchUnit, dependency-cruiser ou import-linter como `gates`.
+
+É o que torna verificável a pergunta "como trocar o provedor de LLM sem alterar a lógica de
+negócio?": se o domínio não importa o provedor, trocar o adapter não toca no negócio.
+
+## Modos de falha: `design.dependencies`
+
+Toda dependência externa declara como o sistema se comporta quando ela falha:
+
+```yaml
+design:
+  dependencies:
+    - name: gateway de pagamento
+      kind: external_api        # llm | vector_store | database | cache | queue | external_api | tool | process
+      timeout_ms: 5000
+      retry: {max_attempts: 3, backoff: exponential}
+      fallback: enfileira para reprocessar e avisa o cliente
+      side_effects: true        # cobra, escreve, envia, cria pedido
+      idempotent: true          # chave de idempotência: repetir não cobra duas vezes
+      covered_by: [AC-012, AC-013]   # testes que simulam timeout, 429, indisponibilidade
+```
+
+O `sdd validate` exige:
+
+| Regra | Pergunta de arquitetura que responde |
+|---|---|
+| `timeout_ms`, `retry` e `fallback` em toda dependência | Como tratar timeout, rate limit e indisponibilidade do provedor? |
+| `max_attempts > 1` com `side_effects: true` exige `idempotent: true` | Como impedir que o agente execute a mesma transação duas vezes? |
+| `covered_by` com IDs que existem na spec | O tratamento de falha é testado ou só prometido? |
+| `dependencies` declarado (lista vazia é uma afirmação explícita) | Alguém pensou nas dependências? |
+
+O relatório do `check` traz a tabela de dependências com o estado dos testes de cada uma.
+
 ## Sistemas com LLM: `sdd eval`
 
 Testes cobrem o código ao redor do modelo. O comportamento do modelo (escolher a tool
@@ -344,6 +411,11 @@ agente, não verificação). Elas combinam bem com o sdd-kit se você usar a ski
   e só cobre operadores, não remoção de linhas ou troca de constantes. Execução interrompida
   à força (kill) pode deixar a cópia em `/tmp/sdd-mutate-*`.
 - `size` é declarado por quem escreve a spec; a única trava objetiva é o número de arquivos.
+- O `arch` lê imports como texto: não vê dependências indiretas (A importa B que importa
+  infra), import dinâmico por string montada em tempo de execução, nem injeção por
+  reflexão. Cobre o caso comum; para o resto, ferramentas dedicadas como gates.
+- `dependencies` garante que o modo de falha foi **declarado e tem teste ligado**, não que
+  o teste simula a falha de verdade. Revisão humana confere.
 - O `eval` garante a aritmética e a integridade dos resultados, não a **qualidade do
   dataset**: um dataset fácil demais ou que não representa produção aprova um agente ruim.
   Também não impede um harness que grava `pass: true` sem chamar o modelo; isso é código

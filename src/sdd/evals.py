@@ -9,11 +9,11 @@ from __future__ import annotations
 import json
 import math
 import shutil
-import subprocess
 from collections import defaultdict
 from pathlib import Path
 
 from .core import Project, dataset_ids
+from .procs import run_shell
 from .models import Eval
 
 Z95 = 1.959964
@@ -110,13 +110,10 @@ def run(proj: Project) -> dict:
     out_dir = proj.root / cfg.results_dir
     shutil.rmtree(out_dir, ignore_errors=True)  # nunca aceitar resultado de execução anterior
     out_dir.mkdir(parents=True)
-    try:
-        p = subprocess.run(cfg.command, shell=True, cwd=proj.root, capture_output=True,
-                           text=True, encoding="utf-8", errors="replace",
-                           timeout=cfg.timeout)
-        rc, out = p.returncode, (p.stdout + p.stderr)[-4000:]
-    except subprocess.TimeoutExpired:
-        rc, out = -1, f"harness excedeu {cfg.timeout}s"
+    r = run_shell(cfg.command, proj.root, cfg.timeout)
+    rc, out = r.returncode, r.output[-4000:]
+    if r.timed_out:
+        out = f"harness excedeu {cfg.timeout}s"
     report["harness"] = {"command": cfg.command, "exit_code": rc, "output": out if rc else ""}
     if rc != 0:
         report["problems"].append(f"harness saiu com código {rc}")

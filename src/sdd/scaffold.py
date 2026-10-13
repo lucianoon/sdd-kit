@@ -48,6 +48,25 @@ decisions:
     decision: Comportamento é definido em specs/; código que diverge está errado.
     rationale: Agentes de IA não guardam contexto entre sessões; o repositório guarda.
 """,
+    "specs/architecture.yaml": """\
+# Regras de dependência entre camadas, verificadas pelo `sdd check` (e `sdd arch`).
+# Lê os imports de Python, JS/TS e Go. Exceção pontual, na própria linha do import:
+#   import openai  # sdd: allow ARCH-001 adapter legado, migração em AD-007
+# (sem motivo, a marcação não vale)
+rules: []
+  # Hexagonal / Clean Architecture: o domínio não conhece framework nem provedor.
+  # Assim o provedor de LLM, o orquestrador e o banco trocam sem reescrever o negócio.
+  # - id: ARCH-001
+  #   description: Domínio não depende de infraestrutura nem de provedores de IA
+  #   from: ["src/domain/**"]
+  #   forbid: [openai, anthropic, "langchain*", "langgraph*", "@langchain/*", redis, sqlalchemy, boto3]
+  #   forbid_paths: ["src/adapters/**", "src/infra/**"]
+  #
+  # - id: ARCH-002
+  #   description: Tools só chegam ao LLM pelo adapter, nunca direto da API HTTP
+  #   from: ["src/api/**"]
+  #   forbid_paths: ["src/adapters/llm/**"]
+""",
     "specs/constitution.md": """\
 # Constituição do projeto
 
@@ -64,6 +83,8 @@ Regras que valem para qualquer agente e qualquer pessoa.
    números com fonte, fluxo de dados, ao menos duas alternativas e riscos tratados.
 6. Números de volume, latência e erro vêm de pessoas ou de medição. Agente não inventa.
 7. Spec com pergunta aberta não está pronta para implementar.
+   Dependências entre camadas seguem `specs/architecture.yaml`; toda dependência externa
+   declara timeout, retry, fallback e idempotência.
    Comportamento de LLM é verificado por `evals` estatísticos, nunca por um teste isolado;
    o dataset de um eval só muda junto com a spec.
 8. Exigem aprovação humana explícita: push, deploy, migrações destrutivas, banco de
@@ -142,6 +163,16 @@ design:
       severity: low
       description: exemplo de risco aceito
       accepted: substitua por um risco real ou remova
+  # Toda dependência externa: como se comporta quando falha. `[]` afirma que não há nenhuma.
+  dependencies:
+    - name: provedor de LLM
+      kind: llm            # llm | vector_store | database | cache | queue | external_api | tool | process
+      timeout_ms: 30000
+      retry: {max_attempts: 3, backoff: exponential}
+      fallback: modelo secundário; se também falhar, resposta padrão e handoff humano
+      side_effects: false  # escreve, cobra, envia, cria pedido?
+      idempotent: true     # repetir dá o mesmo efeito? retry + efeito colateral exige true
+      covered_by: [AC-001] # AC/NFR/EVAL que testam a falha (substitua)
 
 # Comportamento de LLM: critério estatístico sobre um dataset versionado (sdd eval).
 evals: []
@@ -203,9 +234,13 @@ Na dúvida, escolha o maior. O `sdd diff` reprova `small` que altera mais de 3 a
 2. **Fluxo de dados.** Como chegam (HTTP, stream, arquivo) e onde são consumidos.
 3. **Alternativas.** Ao menos duas, entregando o mesmo escopo. Lidere com a recomendação.
 4. **Riscos.** Cada um mitigado por um AC/NFR testável ou aceito com motivo escrito.
-5. Respeite as decisões ativas em `specs/decisions.yaml`. Conflito? Proponha uma nova
+5. **Modos de falha.** Para cada dependência externa (LLM, banco, fila, API, tool):
+   timeout, retry, fallback, se tem efeito colateral e se é idempotente. Retry em operação
+   com efeito colateral exige idempotência (ex.: chave de idempotência); o validador cobra.
+   Cada dependência aponta para os testes que simulam a falha (`covered_by`).
+6. Respeite as decisões ativas em `specs/decisions.yaml`. Conflito? Proponha uma nova
    decisão que substitua a antiga; não a ignore em silêncio.
-6. Apresente o `design` para aprovação humana antes de escrever código.
+7. Apresente o `design` para aprovação humana antes de escrever código.
 
 ## 3. Quebre em tarefas (large/complex)
 
@@ -248,6 +283,9 @@ sdd validate && sdd check && sdd mutate
   e na documentação oficial; se não achar, diga que não sabe.
 - Push, deploy, migração destrutiva e banco de produção exigem aprovação explícita
   para aquela ação; aprovar a spec não autoriza nada disso.
+- Respeite `specs/architecture.yaml`: domínio não importa framework, provedor de LLM nem
+  infraestrutura; dependa de interfaces (ports) e implemente adapters. `sdd arch` verifica.
+  Nunca adicione `sdd: allow` sem pedir aprovação; a exceção fica registrada no relatório.
 """,
     ".github/workflows/sdd.yml": """\
 name: sdd

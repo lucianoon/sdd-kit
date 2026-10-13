@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,10 +10,11 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from .models import Config, Decision, DecisionLog, Spec
+from .models import ArchRule, Architecture, Config, Decision, DecisionLog, Spec
 
 CONFIG_PATH = "specs/sdd.yaml"
 DECISIONS_PATH = "specs/decisions.yaml"
+ARCH_PATH = "specs/architecture.yaml"
 FEATURES_GLOB = "specs/features/*/spec.yaml"
 ID_IN_TEST = re.compile(r"(?<![A-Za-z])(AC|NFR)[-_](\d{3,})", re.IGNORECASE)
 
@@ -25,6 +25,7 @@ class Project:
     config: Config | None = None
     specs: dict[str, Spec] = field(default_factory=dict)  # caminho relativo -> spec
     decisions: dict[str, Decision] = field(default_factory=dict)
+    arch: list[ArchRule] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
 
@@ -69,6 +70,20 @@ def load(root: Path) -> Project:
         except yaml.YAMLError as exc:
             proj.errors.append(f"{DECISIONS_PATH}: YAML inválido: {exc}")
 
+    arch_file = root / ARCH_PATH
+    if arch_file.exists():
+        try:
+            proj.arch = Architecture.model_validate(_load_yaml(arch_file) or {}).rules
+        except ValidationError as exc:
+            proj.errors += _fmt(ARCH_PATH, exc)
+        except yaml.YAMLError as exc:
+            proj.errors.append(f"{ARCH_PATH}: YAML inválido: {exc}")
+    arch_ids: set[str] = set()
+    for rule in proj.arch:
+        if rule.id in arch_ids:
+            proj.errors.append(f"{ARCH_PATH}: regra {rule.id} duplicada")
+        arch_ids.add(rule.id)
+
     files = sorted(root.glob(FEATURES_GLOB))
     if not files:
         proj.errors.append(f"nenhuma spec em {FEATURES_GLOB}")
@@ -112,9 +127,16 @@ def load(root: Path) -> Project:
         if spec.design:
             for k, risk in enumerate(spec.design.risks):
                 for ref in risk.mitigated_by:
+                    if ref not in crit_ids and ref not in arch_ids:
+                        proj.errors.append(
+                            f"{rel}: design.risks.{k}: mitigated_by '{ref}' não é AC, NFR ou EVAL "
+                            f"desta spec nem regra ARCH do projeto")
+            for dep in spec.design.dependencies:
+                for ref in dep.covered_by:
                     if ref not in crit_ids:
                         proj.errors.append(
-                            f"{rel}: design.risks.{k}: mitigated_by '{ref}' não é AC, NFR nem EVAL desta spec")
+                            f"{rel}: dependência '{dep.name}': covered_by '{ref}' não é AC, NFR "
+                            f"nem EVAL desta spec")
         for ev in spec.evals:
             if ev.judge == "llm" and proj.config and not proj.config.evals.allow_llm_judge:
                 proj.errors.append(
@@ -191,22 +213,34 @@ def orphans(proj: Project, junit: dict) -> list[str]:
     return sorted(set(junit) - known)
 
 
-def run(cmd: str, root: Path) -> tuple[int, str]:
-    p = subprocess.run(cmd, shell=True, cwd=root, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
-    return p.returncode, (p.stdout + p.stderr)[-4000:]
+def run(cmd: str, root: Path, timeout: int = 3600) -> tuple[int, str]:
+    """Roda um comando de shell. Estouro de timeout vira código -1, nunca um travamento."""
+    from .procs import run_shell
+
+    r = run_shell(cmd, root, timeout)
+    if r.timed_out:
+        return -1, f"comando excedeu o timeout de {timeout}s: {cmd}"
+    return r.returncode, r.output[-4000:]
 
 
 def check(proj: Project) -> dict:
-    """Roda testes e gates e devolve o relatório. Pressupõe proj sem erros."""
+    """Roda arquitetura, testes e gates e devolve o relatório. Pressupõe proj sem erros."""
+    from . import arch
+
     cfg = proj.config
     assert cfg is not None
+    problems: list[str] = []
+
+    arch_report = arch.check(proj)
+    problems += arch_report["problems"]
+    problems += [f"{v['rule']}: {v['file']}:{v['line']} importa '{v['import']}'"
+                 for v in arch_report["violations"]]
+
     junit_path = proj.root / cfg.tests.junit
     junit_path.parent.mkdir(parents=True, exist_ok=True)
     junit_path.unlink(missing_ok=True)  # nunca aceitar evidência de execução anterior
-    test_rc, test_out = run(cfg.tests.command, proj.root)
+    test_rc, test_out = run(cfg.tests.command, proj.root, cfg.tests.timeout)
 
-    problems: list[str] = []
     junit: dict = {}
     if junit_path.exists():
         try:
@@ -222,20 +256,23 @@ def check(proj: Project) -> dict:
             problems.append(f"{r['id']} ({r['feature']}): {r['verdict']}")
     for o in orphans(proj, junit):
         problems.append(f"{o}: citado em teste mas ausente das specs")
-    if test_rc != 0:
+    if test_rc == -1:
+        problems.append(f"suíte de testes excedeu o timeout de {cfg.tests.timeout}s")
+    elif test_rc != 0:
         problems.append(f"suíte de testes saiu com código {test_rc}")
 
     gates = []
     needed = sorted({g for s in proj.specs.values() for g in s.quality_gates})
     for g in needed:
-        rc, out = run(cfg.gates[g], proj.root)
+        rc, out = run(cfg.gates[g], proj.root, cfg.tests.timeout)
         gates.append({"gate": g, "command": cfg.gates[g], "ok": rc == 0, "output": out if rc else ""})
         if rc != 0:
             problems.append(f"gate '{g}' falhou (código {rc})")
 
     return {
         "ok": not problems, "problems": problems, "criteria": rows, "gates": gates,
-        "risks": risk_matrix(proj),
+        "risks": risk_matrix(proj), "architecture": arch_report,
+        "dependencies": dependency_matrix(proj),
         "tests": {"command": cfg.tests.command, "exit_code": test_rc,
                   "output": test_out if test_rc else ""},
     }
@@ -253,6 +290,15 @@ def risk_matrix(proj: Project) -> list[dict]:
     return out
 
 
+def dependency_matrix(proj: Project) -> list[dict]:
+    out = []
+    for spec in proj.specs.values():
+        if spec.design:
+            for d in spec.design.dependencies:
+                out.append({"feature": spec.feature, **d.model_dump()})
+    return out
+
+
 def render_markdown(report: dict) -> str:
     verdicts = {r["id"]: r["verdict"] for r in report["criteria"]}
     out = ["# Relatório de conformidade SDD", "",
@@ -266,6 +312,10 @@ def render_markdown(report: dict) -> str:
         out += [f"| {g['gate']} | `{g['command']}` | {'OK' if g['ok'] else 'FALHOU'} |" for g in report["gates"]]
     if report.get("risks"):
         out += ["", "## Riscos", "", "| Feature | Área | Severidade | Risco | Tratamento |", "|---|---|---|---|---|"]
+        arch_rep = report.get("architecture") or {}
+        violated = {v["rule"] for v in arch_rep.get("violations", [])}
+        for rule_id in arch_rep.get("rules", []):
+            verdicts[rule_id] = "VIOLADA" if rule_id in violated else "OK"
         for k in report["risks"]:
             if k["mitigated_by"]:
                 how = ", ".join(
@@ -274,6 +324,29 @@ def render_markdown(report: dict) -> str:
             else:
                 how = f"aceito: {k['accepted']}"
             out.append(f"| {k['feature']} | {k['area']} | {k['severity']} | {k['description']} | {how} |")
+    arch_rep = report.get("architecture") or {}
+    if arch_rep.get("rules"):
+        out += ["", "## Arquitetura", ""]
+        if arch_rep["violations"]:
+            out += ["| Regra | Onde | Import proibido |", "|---|---|---|"]
+            out += [f"| {v['rule']} | `{v['file']}:{v['line']}` | `{v['import']}` |"
+                    for v in arch_rep["violations"]]
+        else:
+            out.append(f"{len(arch_rep['rules'])} regra(s), {arch_rep['files']} arquivo(s) "
+                       "verificado(s), nenhuma violação.")
+        if arch_rep["exceptions"]:
+            out += ["", "Exceções declaradas no código:", ""]
+            out += [f"- {e['rule']} em `{e['file']}:{e['line']}` (`{e['import']}`): {e['reason']}"
+                    for e in arch_rep["exceptions"]]
+    if report.get("dependencies"):
+        out += ["", "## Dependências e modos de falha", "",
+                "| Feature | Dependência | Timeout | Tentativas | Efeito colateral | Idempotente | Fallback | Testado por |",
+                "|---|---|---|---|---|---|---|---|"]
+        for d in report["dependencies"]:
+            tested = ", ".join(f"{i} ({verdicts.get(i, 'ver sdd eval')})" for i in d["covered_by"])
+            out.append(f"| {d['feature']} | {d['name']} ({d['kind']}) | {d['timeout_ms']} ms | "
+                       f"{d['retry']['max_attempts']} | {'sim' if d['side_effects'] else 'não'} | "
+                       f"{'sim' if d['idempotent'] else 'não'} | {d['fallback']} | {tested} |")
     if report["problems"]:
         out += ["", "## Problemas", ""] + [f"- {p}" for p in report["problems"]]
     return "\n".join(out) + "\n"

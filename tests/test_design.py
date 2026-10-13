@@ -29,6 +29,7 @@ BASE_SPEC = {
         ],
         "risks": [{"area": "performance", "severity": "high", "description": "pico",
                    "mitigated_by": ["NFR-001"]}],
+        "dependencies": [],
     },
 }
 
@@ -94,7 +95,7 @@ def test_ac_018_risco_sem_tratamento(tmp_path):
 
 def test_ac_018_mitigacao_com_id_inexistente(tmp_path):
     project(tmp_path, spec_with(lambda s: s["design"]["risks"][0].update(mitigated_by=["AC-777"])))
-    assert "'AC-777' não é AC, NFR nem EVAL desta spec" in errors(tmp_path)
+    assert "'AC-777' não é AC, NFR ou EVAL desta spec nem regra ARCH" in errors(tmp_path)
 
 
 def test_ac_018_risco_aceito_com_motivo_e_valido(tmp_path):

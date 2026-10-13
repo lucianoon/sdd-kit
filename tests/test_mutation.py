@@ -117,3 +117,73 @@ def test_operadores_nao_quebram_setas_e_incrementos(tmp_path):
     (tmp_path / "a.ts").write_text(encoding="utf-8", data="const f = (x) => x->y;\ni++;\nx += 1;\nif (a >= b) {}\n")
     ops = {(m.line, m.operator) for m in candidates(tmp_path, ["a.ts"])}
     assert ops == {(4, ">=→<")}
+
+
+LOOP = '''\
+def contar(n):
+    i = 0
+    while i != n:
+        i = i + 1
+    return i
+'''
+LOOP_TEST = '''\
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
+from calc import contar
+
+def test_contar():
+    assert contar(3) == 3
+'''
+
+
+def test_ac_056_mutante_que_trava_conta_como_morto(tmp_path):
+    project(tmp_path, LOOP_TEST, code=LOOP)
+    cfg_file = tmp_path / "specs/sdd.yaml"
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
+    cfg["mutation"]["timeout"] = 3
+    cfg_file.write_text(encoding="utf-8", data=yaml.safe_dump(cfg))
+    r = mutate(tmp_path)
+    assert "timeout   src/calc.py:4" in r.output, r.output
+    assert r.exit_code == 0
+
+
+def test_ac_057_mutacao_de_mesmo_tamanho_e_detectada(tmp_path):
+    # "a + b" -> "a - b" não muda o tamanho do arquivo: cache de bytecode mascararia o mutante.
+    soma = "def soma(a, b):\n    return a + b\n"
+    teste = FORTE.split("from calc")[0] + "from calc import soma\n\ndef test_soma():\n    assert soma(2, 3) == 5\n"
+    project(tmp_path, teste, code=soma)
+    r = mutate(tmp_path)
+    assert "killed    src/calc.py:2" in r.output, r.output
+    assert r.exit_code == 0
+
+
+def test_ac_057_testes_rodam_sem_escrever_bytecode(tmp_path):
+    # Determinístico: a suíte só passa se o mutate desligar o cache de bytecode.
+    project(tmp_path, FORTE)
+    cfg_file = tmp_path / "specs/sdd.yaml"
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
+    cfg["tests"]["command"] = (f"{PY} -c \"import os, sys; "
+                               "sys.exit(0 if os.environ.get('PYTHONDONTWRITEBYTECODE') == '1' else 1)\"")
+    cfg_file.write_text(encoding="utf-8", data=yaml.safe_dump(cfg))
+    r = mutate(tmp_path)
+    assert "não passa sem mutações" not in r.output, r.output
+
+
+def test_ac_057_cada_escrita_tem_mtime_maior_e_preserva_quebras(tmp_path):
+    from sdd.mutation import _Clock, _read, _write
+    f = tmp_path / "a.py"
+    clock = _Clock()
+    _write(f, "x = 1\r\ny = 2\r\n", clock)
+    t1 = f.stat().st_mtime
+    _write(f, "x = 1\r\ny = 3\r\n", clock)  # mesmo tamanho, escrita imediata
+    assert f.stat().st_mtime >= t1 + 2
+    assert _read(f) == "x = 1\r\ny = 3\r\n"
+
+
+def test_ac_058_aspas_triplas_em_string_nao_escondem_codigo(tmp_path):
+    (tmp_path / "a.py").write_text(encoding="utf-8", data=(
+        "SEP = '\"\"\"'\n"
+        "ok = a > b\n"
+        'DOC = """\nx > y\n"""\n'
+    ))
+    assert [(m.line, m.operator) for m in candidates(tmp_path, ["a.py"])] == [(2, ">→<=")]

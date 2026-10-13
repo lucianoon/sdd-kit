@@ -104,11 +104,39 @@ class Risk(Strict):
         return self
 
 
+class Retry(Strict):
+    max_attempts: int = Field(ge=1)  # 1 = sem retry
+    backoff: Literal["none", "fixed", "exponential"] = "exponential"
+
+
+class Dependency(Strict):
+    """Dependência externa e como o sistema se comporta quando ela falha."""
+    name: str = Field(min_length=1)
+    kind: Literal["llm", "vector_store", "database", "cache", "queue",
+                  "external_api", "tool", "process"]
+    timeout_ms: int = Field(ge=1)  # sem timeout não existe: uma chamada pendurada derruba o fluxo
+    retry: Retry
+    fallback: str = Field(min_length=1)  # o que acontece quando esgota; "nenhum: <motivo>" é válido
+    side_effects: bool  # escreve, cobra, envia, cria pedido...
+    idempotent: bool  # repetir a operação produz o mesmo resultado?
+    covered_by: list[str] = Field(min_length=1)  # AC/NFR/EVAL desta spec que testam a falha
+
+    @model_validator(mode="after")
+    def _retry_seguro(self):
+        if self.retry.max_attempts > 1 and self.side_effects and not self.idempotent:
+            raise ValueError(
+                "retry em operação com efeito colateral e não idempotente pode duplicar a "
+                "transação: torne-a idempotente (ex.: chave de idempotência) ou use max_attempts: 1")
+        return self
+
+
 class Design(Strict):
     numbers: list[Number] = Field(min_length=1)
     data_flow: DataFlow
     alternatives: list[Alternative] = Field(min_length=2)
     risks: list[Risk] = Field(min_length=1)
+    # Obrigatório declarar, mesmo vazio: `dependencies: []` afirma que não há dependência externa.
+    dependencies: list[Dependency]
 
     @model_validator(mode="after")
     def _uma_escolhida(self):
@@ -156,6 +184,32 @@ class Eval(Strict):
         if self.use_lower_bound and self.aggregate != "pass_rate":
             raise ValueError("use_lower_bound só vale para aggregate: pass_rate")
         return self
+
+
+# --- Arquitetura: regras de dependência entre camadas ---------------------------
+
+ARCH_PATTERN = r"^ARCH-\d{3,}$"
+
+
+class ArchRule(BaseModel):
+    """Arquivos em `from` não podem importar `forbid` (módulos) nem `forbid_paths` (arquivos
+    do repo). Ex.: domínio não importa LangGraph, provedor de LLM nem a camada de infra."""
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    id: str = Field(pattern=ARCH_PATTERN)
+    description: str = Field(min_length=1)
+    sources: list[str] = Field(alias="from", min_length=1)  # globs dos arquivos sujeitos à regra
+    forbid: list[str] = []  # módulos: "openai", "langchain*", "@langchain/core", "myapp.infra"
+    forbid_paths: list[str] = []  # arquivos do repo alcançados por import relativo: "src/infra/**"
+
+    @model_validator(mode="after")
+    def _algo_proibido(self):
+        if not self.forbid and not self.forbid_paths:
+            raise ValueError("informe forbid e/ou forbid_paths")
+        return self
+
+
+class Architecture(Strict):
+    rules: list[ArchRule] = []
 
 
 # --- Escopo: premissas, perguntas, decisões -------------------------------------
@@ -229,6 +283,7 @@ class Spec(Strict):
 class TestsConfig(Strict):
     command: str
     junit: str
+    timeout: int = Field(3600, ge=1)  # segundos; vale para testes e gates
 
 
 class Config(Strict):
