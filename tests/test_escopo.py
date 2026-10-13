@@ -27,11 +27,11 @@ DECISIONS = {"decisions": [
 
 def project(root: Path, spec: dict, decisions: dict | None = None):
     (root / "specs/features/FEATURE-001").mkdir(parents=True)
-    (root / "specs/sdd.yaml").write_text(yaml.safe_dump(
+    (root / "specs/sdd.yaml").write_text(encoding="utf-8", data=yaml.safe_dump(
         {"tests": {"command": "true", "junit": ".sdd/j.xml"}, "require_design": True}))
-    (root / "specs/features/FEATURE-001/spec.yaml").write_text(yaml.safe_dump(spec, allow_unicode=True))
+    (root / "specs/features/FEATURE-001/spec.yaml").write_text(encoding="utf-8", data=yaml.safe_dump(spec, allow_unicode=True))
     if decisions is not None:
-        (root / "specs/decisions.yaml").write_text(yaml.safe_dump(decisions))
+        (root / "specs/decisions.yaml").write_text(encoding="utf-8", data=yaml.safe_dump(decisions))
     return "\n".join(core.load(root).errors)
 
 

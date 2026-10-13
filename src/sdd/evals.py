@@ -112,7 +112,8 @@ def run(proj: Project) -> dict:
     out_dir.mkdir(parents=True)
     try:
         p = subprocess.run(cfg.command, shell=True, cwd=proj.root, capture_output=True,
-                           text=True, timeout=cfg.timeout)
+                           text=True, encoding="utf-8", errors="replace",
+                           timeout=cfg.timeout)
         rc, out = p.returncode, (p.stdout + p.stderr)[-4000:]
     except subprocess.TimeoutExpired:
         rc, out = -1, f"harness excedeu {cfg.timeout}s"

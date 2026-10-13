@@ -50,19 +50,19 @@ def test_roda():
 
 def project(root: Path, tests: str, code: str = CODE, min_score: float = 0.8):
     (root / "specs/features/FEATURE-001").mkdir(parents=True)
-    (root / "specs/sdd.yaml").write_text(yaml.safe_dump({
+    (root / "specs/sdd.yaml").write_text(encoding="utf-8", data=yaml.safe_dump({
         "tests": {"command": f"{PY} -m pytest -q -x -p no:cacheprovider t", "junit": ".sdd/j.xml"},
         "mutation": {"min_score": min_score, "timeout": 60},
     }))
-    (root / "specs/features/FEATURE-001/spec.yaml").write_text(yaml.safe_dump({
+    (root / "specs/features/FEATURE-001/spec.yaml").write_text(encoding="utf-8", data=yaml.safe_dump({
         "feature": "calc", "version": 1, "size": "small", "paths": ["src/**"],
         "requirements": [{"id": "REQ-001", "description": "d",
                           "acceptance": [{"id": "AC-001", "given": "g", "when": "w", "then": "t"}]}],
     }))
     (root / "src").mkdir()
-    (root / "src/calc.py").write_text(code)
+    (root / "src/calc.py").write_text(encoding="utf-8", data=code)
     (root / "t").mkdir()
-    (root / "t/test_calc.py").write_text(tests)
+    (root / "t/test_calc.py").write_text(encoding="utf-8", data=tests)
     return root
 
 
@@ -81,7 +81,7 @@ def test_ac_030_testes_fracos_reprovam_com_arquivo_e_linha(tmp_path):
     r = mutate(project(tmp_path, FRACO))
     assert r.exit_code == 1, r.output
     assert "survived  src/calc.py:2" in r.output
-    report = (tmp_path / ".sdd/mutation.md").read_text()
+    report = (tmp_path / ".sdd/mutation.md").read_text(encoding="utf-8")
     assert "REPROVADO" in report and "`src/calc.py:2`" in report
 
 
@@ -103,7 +103,7 @@ def test_ac_032_suite_quebrada_sem_mutacao_e_erro(tmp_path):
 def test_ac_033_strings_comentarios_e_marcacao_nao_sao_mutados(tmp_path):
     src = tmp_path / "src"
     src.mkdir()
-    (src / "a.py").write_text(
+    (src / "a.py").write_text(encoding="utf-8", data=
         'msg = "a > b and c"  # x > y\n'
         "# return a > b\n"
         "limite = a > b  # sdd: no-mutate\n"
@@ -114,6 +114,6 @@ def test_ac_033_strings_comentarios_e_marcacao_nao_sao_mutados(tmp_path):
 
 
 def test_operadores_nao_quebram_setas_e_incrementos(tmp_path):
-    (tmp_path / "a.ts").write_text("const f = (x) => x->y;\ni++;\nx += 1;\nif (a >= b) {}\n")
+    (tmp_path / "a.ts").write_text(encoding="utf-8", data="const f = (x) => x->y;\ni++;\nx += 1;\nif (a >= b) {}\n")
     ops = {(m.line, m.operator) for m in candidates(tmp_path, ["a.ts"])}
     assert ops == {(4, ">=→<")}

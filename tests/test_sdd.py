@@ -26,16 +26,16 @@ def make(root: Path, test_body: str, gates: str = "", gate_cmd: str | None = Non
     """Projeto mínimo cujo 'runner de testes' é o pytest de verdade."""
     (root / "specs").mkdir()
     gate_yaml = f"\ngates:\n  g1: '{gate_cmd}'" if gate_cmd else ""
-    (root / "specs/sdd.yaml").write_text(
+    (root / "specs/sdd.yaml").write_text(encoding="utf-8", data=
         f"version: 1\ntests:\n  command: '{PY} -m pytest -q -p no:cacheprovider --junitxml=.sdd/junit.xml t'\n"
         f"  junit: .sdd/junit.xml{gate_yaml}\n"
     )
     for i, (feat, req, ac) in enumerate(specs or [("f1", "REQ-001", "AC-001")], 1):
         d = root / f"specs/features/FEATURE-{i:03d}"
         d.mkdir(parents=True)
-        (d / "spec.yaml").write_text(SPEC.format(feature=feat, req=req, ac=ac, gates=gates))
+        (d / "spec.yaml").write_text(encoding="utf-8", data=SPEC.format(feature=feat, req=req, ac=ac, gates=gates))
     (root / "t").mkdir()
-    (root / "t/test_x.py").write_text(test_body)
+    (root / "t/test_x.py").write_text(encoding="utf-8", data=test_body)
     return root
 
 
@@ -75,7 +75,7 @@ def test_ac_006_tudo_passando_aprova_e_grava_relatorio(tmp_path):
     make(tmp_path, "def test_ac_001_x(): pass\n")
     result = runner.invoke(app, ["check", "-C", str(tmp_path)])
     assert result.exit_code == 0, result.output
-    assert "APROVADO" in (tmp_path / ".sdd/report.md").read_text()
+    assert "APROVADO" in (tmp_path / ".sdd/report.md").read_text(encoding="utf-8")
     assert (tmp_path / ".sdd/report.json").exists()
 
 
@@ -111,5 +111,5 @@ def test_pulado_nao_conta_como_evidencia(tmp_path):
 def test_campo_desconhecido_e_rejeitado(tmp_path):
     make(tmp_path, "")
     f = tmp_path / "specs/features/FEATURE-001/spec.yaml"
-    f.write_text(f.read_text() + "campo_inventado: 1\n")
+    f.write_text(encoding="utf-8", data=f.read_text(encoding="utf-8") + "campo_inventado: 1\n")
     assert core.load(tmp_path).errors

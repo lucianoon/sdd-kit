@@ -192,7 +192,8 @@ def orphans(proj: Project, junit: dict) -> list[str]:
 
 
 def run(cmd: str, root: Path) -> tuple[int, str]:
-    p = subprocess.run(cmd, shell=True, cwd=root, capture_output=True, text=True)
+    p = subprocess.run(cmd, shell=True, cwd=root, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     return p.returncode, (p.stdout + p.stderr)[-4000:]
 
 

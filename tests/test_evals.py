@@ -17,10 +17,10 @@ PY = sys.executable
 # Harness falso: lê plan.json e grava os resultados brutos que o "agente" teria produzido.
 HARNESS = '''\
 import json, pathlib
-plan = json.loads(pathlib.Path("plan.json").read_text())
+plan = json.loads(pathlib.Path("plan.json").read_text(encoding="utf-8"))
 out = pathlib.Path(".sdd/evals"); out.mkdir(parents=True, exist_ok=True)
 for eval_id, lines in plan.items():
-    (out / f"{eval_id}.jsonl").write_text("".join(json.dumps(l) + "\\n" for l in lines))
+    (out / f"{eval_id}.jsonl").write_text(encoding="utf-8", data="".join(json.dumps(l) + "\\n" for l in lines))
 '''
 
 EVAL = {"id": "EVAL-001", "metric": "tool_selection_accuracy", "dataset": "evals/tools.jsonl",
@@ -40,21 +40,21 @@ def project(root: Path, ev: dict | None = None, plan=None, allow_llm=False, case
             harness=True):
     (root / "specs/features/FEATURE-001").mkdir(parents=True)
     (root / "evals").mkdir()
-    (root / "evals/tools.jsonl").write_text(
+    (root / "evals/tools.jsonl").write_text(encoding="utf-8", data=
         "".join(json.dumps({"id": f"c{i}", "input": "..."}) + "\n" for i in range(cases)))
     cfg = {"tests": {"command": "true", "junit": "j.xml"},
            "evals": {"allow_llm_judge": allow_llm}}
     if harness:
         cfg["evals"]["command"] = f"{PY} harness.py"
-        (root / "harness.py").write_text(HARNESS)
-        (root / "plan.json").write_text(json.dumps(
+        (root / "harness.py").write_text(encoding="utf-8", data=HARNESS)
+        (root / "plan.json").write_text(encoding="utf-8", data=json.dumps(
             {"EVAL-001": plan if plan is not None else lines_for([0.9, 0.91, 0.92])}))
-    (root / "specs/sdd.yaml").write_text(yaml.safe_dump(cfg))
+    (root / "specs/sdd.yaml").write_text(encoding="utf-8", data=yaml.safe_dump(cfg))
     spec = {"feature": "agente", "version": 1, "size": "small",
             "requirements": [{"id": "REQ-001", "description": "d",
                               "acceptance": [{"id": "AC-001", "given": "g", "when": "w", "then": "t"}]}],
             "evals": [ev or EVAL]}
-    (root / "specs/features/FEATURE-001/spec.yaml").write_text(yaml.safe_dump(spec, allow_unicode=True))
+    (root / "specs/features/FEATURE-001/spec.yaml").write_text(encoding="utf-8", data=yaml.safe_dump(spec, allow_unicode=True))
     return root
 
 
@@ -81,7 +81,7 @@ def test_ac_034_cli_aprova_e_grava_relatorio(tmp_path):
     r = runner.invoke(app, ["eval", "-C", str(project(tmp_path))])
     assert r.exit_code == 0, r.output
     assert "OK" in r.output and "EVAL-001" in r.output
-    assert "APROVADO" in (tmp_path / ".sdd/eval.md").read_text()
+    assert "APROVADO" in (tmp_path / ".sdd/eval.md").read_text(encoding="utf-8")
 
 
 def test_ac_035_abaixo_do_limite_reprova(tmp_path):
@@ -150,9 +150,9 @@ def test_ac_038_juiz_llm_permitido_e_sinalizado(tmp_path):
 def test_ac_039_resultado_antigo_descartado(tmp_path):
     project(tmp_path)
     (tmp_path / ".sdd/evals").mkdir(parents=True)
-    (tmp_path / ".sdd/evals/EVAL-001.jsonl").write_text(
+    (tmp_path / ".sdd/evals/EVAL-001.jsonl").write_text(encoding="utf-8", data=
         "".join(json.dumps(l) + "\n" for l in lines_for([0.9, 0.9, 0.9])))
-    (tmp_path / "plan.json").write_text("{}")  # harness desta vez não grava nada
+    (tmp_path / "plan.json").write_text(encoding="utf-8", data="{}")  # harness desta vez não grava nada
     rep = run_eval(tmp_path)
     assert rep["evals"][0]["verdict"] == "SEM_RESULTADO"
 
@@ -195,7 +195,7 @@ def test_mean_score(tmp_path):
 
 def test_harness_quebrado_reprova(tmp_path):
     project(tmp_path)
-    (tmp_path / "harness.py").write_text("raise SystemExit(4)")
+    (tmp_path / "harness.py").write_text(encoding="utf-8", data="raise SystemExit(4)")
     rep = run_eval(tmp_path)
     assert not rep["ok"] and "harness saiu com código 4" in rep["problems"]
 
@@ -208,19 +208,19 @@ def test_sem_command_reprova(tmp_path):
 def test_sem_evals_aprova(tmp_path):
     project(tmp_path)
     f = tmp_path / "specs/features/FEATURE-001/spec.yaml"
-    spec = yaml.safe_load(f.read_text())
+    spec = yaml.safe_load(f.read_text(encoding="utf-8"))
     spec.pop("evals")
-    f.write_text(yaml.safe_dump(spec))
+    f.write_text(encoding="utf-8", data=yaml.safe_dump(spec))
     rep = run_eval(tmp_path)
     assert rep["ok"] is True and rep["evals"] == []
 
 
 def test_harness_quebrado_via_cli_guarda_final_da_saida(tmp_path):
     project(tmp_path)
-    (tmp_path / "harness.py").write_text("print('x' * 9000 + 'CAUSA'); raise SystemExit(3)")
+    (tmp_path / "harness.py").write_text(encoding="utf-8", data="print('x' * 9000 + 'CAUSA'); raise SystemExit(3)")
     r = runner.invoke(app, ["eval", "-C", str(tmp_path)])
     assert r.exit_code == 1
-    saved = json.loads((tmp_path / ".sdd/eval.json").read_text())["harness"]
+    saved = json.loads((tmp_path / ".sdd/eval.json").read_text(encoding="utf-8"))["harness"]
     assert saved["exit_code"] == 3
     assert len(saved["output"]) == 4000 and saved["output"].rstrip().endswith("CAUSA")
 
@@ -228,10 +228,10 @@ def test_harness_quebrado_via_cli_guarda_final_da_saida(tmp_path):
 def test_harness_que_estoura_timeout(tmp_path):
     project(tmp_path)
     cfg_file = tmp_path / "specs/sdd.yaml"
-    cfg = yaml.safe_load(cfg_file.read_text())
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
     cfg["evals"]["timeout"] = 1
-    cfg_file.write_text(yaml.safe_dump(cfg))
-    (tmp_path / "harness.py").write_text("import time; time.sleep(5)")
+    cfg_file.write_text(encoding="utf-8", data=yaml.safe_dump(cfg))
+    (tmp_path / "harness.py").write_text(encoding="utf-8", data="import time; time.sleep(5)")
     rep = run_eval(tmp_path)
     assert rep["harness"]["exit_code"] == -1
     assert "harness excedeu 1s" in rep["harness"]["output"]

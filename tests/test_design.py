@@ -38,11 +38,11 @@ def project(root: Path, spec: dict | None = None, require_design=True, tests: st
     cfg = {"version": 1, "require_design": require_design,
            "tests": {"command": f"{PY} -m pytest -q -p no:cacheprovider --junitxml=.sdd/junit.xml t",
                      "junit": ".sdd/junit.xml"}}
-    (root / "specs/sdd.yaml").write_text(yaml.safe_dump(cfg))
-    (root / "specs/features/FEATURE-001/spec.yaml").write_text(
+    (root / "specs/sdd.yaml").write_text(encoding="utf-8", data=yaml.safe_dump(cfg))
+    (root / "specs/features/FEATURE-001/spec.yaml").write_text(encoding="utf-8", data=
         yaml.safe_dump(spec if spec is not None else BASE_SPEC, allow_unicode=True))
     (root / "t").mkdir()
-    (root / "t/test_x.py").write_text(tests)
+    (root / "t/test_x.py").write_text(encoding="utf-8", data=tests)
     return root
 
 
@@ -134,12 +134,12 @@ def test_ac_020_nfr_com_teste_aprova(tmp_path):
 def test_ac_021_junit_antigo_nao_e_reaproveitado(tmp_path):
     project(tmp_path, spec_with(lambda s: s.pop("design")), require_design=False)
     (tmp_path / ".sdd").mkdir()
-    (tmp_path / ".sdd/junit.xml").write_text(
+    (tmp_path / ".sdd/junit.xml").write_text(encoding="utf-8", data=
         '<testsuite><testcase classname="t" name="test_ac_001_x"/></testsuite>')
     cfg_file = tmp_path / "specs/sdd.yaml"
-    cfg = yaml.safe_load(cfg_file.read_text())
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
     cfg["tests"]["command"] = f'{PY} -c "pass"'  # roda, mas não gera JUnit
-    cfg_file.write_text(yaml.safe_dump(cfg))
+    cfg_file.write_text(encoding="utf-8", data=yaml.safe_dump(cfg))
     report = core.check(core.load(tmp_path))
     assert not report["ok"]
     assert any("não gerou" in p for p in report["problems"])
@@ -156,7 +156,7 @@ def test_nfr_001_validate_200_specs_em_menos_de_2s(tmp_path):
         s["design"]["risks"][0]["mitigated_by"] = [f"NFR-{i:04d}"]
         d = tmp_path / f"specs/features/FEATURE-{i:03d}"
         d.mkdir()
-        (d / "spec.yaml").write_text(yaml.safe_dump(s, allow_unicode=True))
+        (d / "spec.yaml").write_text(encoding="utf-8", data=yaml.safe_dump(s, allow_unicode=True))
     start = time.perf_counter()
     proj = core.load(tmp_path)
     elapsed = time.perf_counter() - start

@@ -18,20 +18,22 @@ jobs:
           - os: macos-latest
             python: "3.12"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with: { python-version: "${{ matrix.python }}" }
       - run: pip install -e ".[dev]"
-      - run: python -m pytest -q
+      # Codificação implícita vira erro: pega no Linux os bugs que só apareceriam no Windows.
+      - run: python -W error::EncodingWarning -m pytest -q
+        env: { PYTHONWARNDEFAULTENCODING: "1" }
 
   # O kit verifica a si mesmo com as próprias regras.
   sdd:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with: { python-version: "3.12" }
       - run: pip install -e ".[dev]"
       - run: sdd validate

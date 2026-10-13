@@ -31,13 +31,13 @@ def git(root: Path, *args: str) -> str:
     env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
     return subprocess.run(["git", *args], cwd=root, env=env, check=True,
-                          capture_output=True, text=True).stdout
+                          capture_output=True, text=True, encoding="utf-8").stdout
 
 
 def write(root: Path, rel: str, text: str):
     p = root / rel
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(text)
+    p.write_text(encoding="utf-8", data=text)
 
 
 @pytest.fixture

@@ -39,7 +39,8 @@ def matches(path: str, patterns: list[str]) -> bool:
 
 
 def _git(root: Path, *args: str) -> str:
-    p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+    p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     if p.returncode != 0:
         raise GitError(f"git {' '.join(args)}: {p.stderr.strip()}")
     return p.stdout
