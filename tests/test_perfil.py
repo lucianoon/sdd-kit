@@ -30,6 +30,14 @@ def write_agents(root: Path, modules=None, coverage=None, stage="local"):
         {"profile": "agentes", "stage": stage, "modules": mods, "coverage": cov}, allow_unicode=True))
 
 
+def set_test_command(root: Path):
+    """Via YAML, não por troca de texto: o caminho do Python no Windows tem barras invertidas."""
+    cfg_file = root / "specs/sdd.yaml"
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
+    cfg["tests"]["command"] = f"{PY} -m pytest -q -p no:cacheprovider --junitxml=.sdd/junit.xml t"
+    cfg_file.write_text(encoding="utf-8", data=yaml.safe_dump(cfg, allow_unicode=True))
+
+
 def errors(root: Path) -> str:
     return "\n".join(core.load(root).errors)
 
@@ -135,10 +143,7 @@ def test_ac_068_check_mostra_a_matriz_com_estado_das_evidencias(tmp_path):
     init(tmp_path)
     write_agents(tmp_path, modules={"L": "ativo"}, coverage={
         r.id: ["AC-001"] for r in catalog().modules["L"].requirements})
-    cfg = tmp_path / "specs/sdd.yaml"
-    cfg.write_text(encoding="utf-8", data=cfg.read_text(encoding="utf-8").replace(
-        'command: "pytest -q --junitxml=.sdd/junit.xml"',
-        f'command: "{PY} -m pytest -q -p no:cacheprovider --junitxml=.sdd/junit.xml t"'))
+    set_test_command(tmp_path)
     (tmp_path / "t").mkdir()
     (tmp_path / "t/test_x.py").write_text(encoding="utf-8",
                                           data="def test_ac_001(): pass\ndef test_nfr_001(): pass\n")
@@ -154,10 +159,7 @@ def test_ac_068_check_mostra_a_matriz_com_estado_das_evidencias(tmp_path):
 def test_ac_068_falha_de_evidencia_aparece_na_matriz(tmp_path):
     init(tmp_path)
     write_agents(tmp_path)
-    cfg = tmp_path / "specs/sdd.yaml"
-    cfg.write_text(encoding="utf-8", data=cfg.read_text(encoding="utf-8").replace(
-        'command: "pytest -q --junitxml=.sdd/junit.xml"',
-        f'command: "{PY} -m pytest -q -p no:cacheprovider --junitxml=.sdd/junit.xml t"'))
+    set_test_command(tmp_path)
     (tmp_path / "t").mkdir()
     (tmp_path / "t/test_x.py").write_text(encoding="utf-8",
                                           data="def test_ac_001(): assert False\ndef test_nfr_001(): pass\n")
