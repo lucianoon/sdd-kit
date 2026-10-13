@@ -19,6 +19,7 @@ pipx install git+https://github.com/lucianoon/sdd-kit
 
 ```bash
 sdd init        # cria specs/, AGENTS.md e .github/workflows/sdd.yml
+sdd specify x   # esqueleto da spec: IDs livres no projeto, seções exigidas pelo --size
 sdd validate    # schema, IDs, design, perguntas abertas, decisões
 sdd check       # roda testes + gates; exit 1 se algum AC/NFR não tiver teste passando
 sdd diff        # exit 1 se código de uma feature mudou sem a spec mudar junto
@@ -32,6 +33,18 @@ O fluxo que o `AGENTS.md` gerado ensina ao agente: **dimensionar → especificar
 → quebrar em tarefas → implementar → verificar**, com profundidade proporcional ao `size`.
 O `sdd` não confia que o agente seguiu o fluxo: cada etapa deixa um artefato que um comando
 verifica.
+
+## Começando uma feature
+
+```bash
+$ sdd specify criar-pedido --size large --acs 2
+criado   specs/features/FEATURE-002/spec.yaml
+IDs      REQ: REQ-002  AC: AC-002, AC-003  NFR: NFR-002
+```
+
+O esqueleto já traz as seções que o `size` exige (design só em `large`/`complex`) e IDs que
+não colidem com nenhuma outra spec. Cada campo a preencher leva o marcador `PREENCHER`, e
+o `sdd validate` reprova apontando arquivo e linha até que todos virem conteúdo real.
 
 ## Como funciona
 

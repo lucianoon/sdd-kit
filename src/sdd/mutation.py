@@ -245,7 +245,7 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
             if on_result:
                 on_result(m)
     finally:
-        shutil.rmtree(work.parent, ignore_errors=True)
+        shutil.rmtree(work.parent, ignore_errors=True)  # sdd: no-mutate (proteção; rmtree normal não falha)
     return rep
 
 

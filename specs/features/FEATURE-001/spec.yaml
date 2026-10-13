@@ -292,6 +292,18 @@ requirements:
         when: o kit encerra o comando
         then: a árvore inteira de processos morre, sem órfãos consumindo CPU
 
+  - id: REQ-014
+    description: Reduzir o atrito de começar uma spec sem afrouxar a validação.
+    acceptance:
+      - id: AC-061
+        given: um projeto com specs existentes
+        when: sdd specify cria uma feature
+        then: os IDs alocados não colidem com nenhuma spec e as seções seguem o size
+      - id: AC-062
+        given: um esqueleto recém-gerado
+        when: sdd validate roda
+        then: cada campo PREENCHER é apontado com arquivo e linha, e o esqueleto preenchido valida
+
 design:
   numbers:
     - id: NFR-001

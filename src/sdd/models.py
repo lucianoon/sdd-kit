@@ -194,7 +194,7 @@ ARCH_PATTERN = r"^ARCH-\d{3,}$"
 class ArchRule(BaseModel):
     """Arquivos em `from` não podem importar `forbid` (módulos) nem `forbid_paths` (arquivos
     do repo). Ex.: domínio não importa LangGraph, provedor de LLM nem a camada de infra."""
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid")
     id: str = Field(pattern=ARCH_PATTERN)
     description: str = Field(min_length=1)
     sources: list[str] = Field(alias="from", min_length=1)  # globs dos arquivos sujeitos à regra

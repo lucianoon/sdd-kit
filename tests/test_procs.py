@@ -58,3 +58,10 @@ def test_ac_059_saida_em_codificacao_do_sistema_e_decodificada():
 def test_filho_python_recebe_utf8(tmp_path):
     r = run_shell(f"{PY} -c \"import os; print(os.environ.get('PYTHONIOENCODING'))\"", tmp_path, 30)
     assert "utf-8" in r.output
+
+
+def test_ac_059_fallback_usa_a_codificacao_do_sistema(monkeypatch):
+    import locale
+    from sdd import procs
+    monkeypatch.setattr(locale, "getencoding", lambda: "cp1252", raising=False)
+    assert procs._decode("olá".encode("cp1252")) == "olá"

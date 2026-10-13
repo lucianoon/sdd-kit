@@ -41,7 +41,8 @@ def matches(path: str, patterns: list[str]) -> bool:
 
 def _git(root: Path, *args: str) -> str:
     try:
-        p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
+        # encoding já liga o modo texto
+        p = subprocess.run(["git", *args], cwd=root, capture_output=True,
                            encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT)
     except subprocess.TimeoutExpired:
         raise GitError(f"git {' '.join(args)}: excedeu {GIT_TIMEOUT}s")

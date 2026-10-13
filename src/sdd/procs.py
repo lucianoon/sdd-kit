@@ -24,7 +24,8 @@ class Result:
 
 def _kill_tree(p: subprocess.Popen) -> None:
     if sys.platform == "win32":
-        subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)], capture_output=True)
+        # sdd: no-mutate (ramo Windows: coberto pelo job windows do CI, não pela mutação no Linux)
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)], capture_output=True)  # sdd: no-mutate
     else:
         try:
             os.killpg(p.pid, signal.SIGKILL)
@@ -38,7 +39,7 @@ def _decode(data: bytes) -> str:
         return data.decode("utf-8")
     except UnicodeDecodeError:
         system = (locale.getencoding() if hasattr(locale, "getencoding")  # Python 3.11+
-                  else locale.getpreferredencoding(False))
+                  else locale.getpreferredencoding(False))  # sdd: no-mutate (só Python 3.10)
         return data.decode(system or "utf-8", errors="replace")
 
 

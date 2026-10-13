@@ -134,3 +134,19 @@ def test_ac_054_falha_do_git_sai_com_2(repo):
 ])
 def test_glob(path, pattern, ok):
     assert matches(path, [pattern]) is ok
+
+
+def test_ac_014_sem_aviso_quando_codigo_muda_junto(repo):
+    write(repo, "src/pedidos/api.py", "x = 2\n")
+    write(repo, "specs/features/FEATURE-001/spec.yaml", SPEC.replace("version: 1", "version: 2"))
+    commit(repo)
+    r = run_diff(repo)
+    assert r.exit_code == 0 and "AVISO" not in r.output
+
+
+def test_ac_014_spec_sem_paths_nao_gera_aviso(repo):
+    write(repo, "specs/features/FEATURE-001/spec.yaml",
+          SPEC.replace('paths: ["src/pedidos/**"]\n', "").replace("version: 1", "version: 2"))
+    commit(repo)
+    r = run_diff(repo)
+    assert "spec alterada sem código" not in r.output

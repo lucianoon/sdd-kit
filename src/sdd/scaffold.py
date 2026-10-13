@@ -219,6 +219,8 @@ Na dúvida, escolha o maior. O `sdd diff` reprova `small` que altera mais de 3 a
 
 ## 1. Especifique
 
+- Comece com `sdd specify <nome> --size <size>`: gera o esqueleto com IDs livres e as
+  seções exigidas. Troque cada `PREENCHER` por conteúdo real; o `sdd validate` aponta o que falta.
 - Requisitos com IDs (`REQ-NNN`) e critérios testáveis (`AC-NNN`): dado / quando / então.
 - Liste o que está **fora de escopo**.
 - Toda lacuna vira `assumptions` (padrão escolhido + justificativa) ou `open_questions`.

@@ -187,3 +187,44 @@ def test_ac_058_aspas_triplas_em_string_nao_escondem_codigo(tmp_path):
         'DOC = """\nx > y\n"""\n'
     ))
     assert [(m.line, m.operator) for m in candidates(tmp_path, ["a.py"])] == [(2, ">→<=")]
+
+
+def test_ac_033_fim_de_string_escape_e_bloco_de_comentario(tmp_path):
+    (tmp_path / "a.py").write_text(encoding="utf-8", data=(
+        'msg = "a" + b  # c > d\n'      # string fecha antes do + ; comentário depois
+        's = "x \\" > y"\n'             # aspas escapadas: o > continua dentro da string
+    ))
+    found = [(m.line, m.col, m.operator) for m in candidates(tmp_path, ["a.py"])]
+    assert found == [(1, 11, "+→-")]
+    (tmp_path / "b.ts").write_text(encoding="utf-8", data="/**\n * se a > b\n */\nconst ok = a > b;\n")
+    assert [(m.line, m.col) for m in candidates(tmp_path, ["b.ts"])] == [(4, 14)]
+
+
+def test_copia_isolada_ignora_git_e_referencia_dependencias(tmp_path):
+    from sdd.mutation import _copy_project
+    root = tmp_path / "proj"
+    for d in (".git", ".sdd", "node_modules/lib", "pkg.egg-info", "src"):
+        (root / d).mkdir(parents=True)
+    (root / "src/a.py").write_text(encoding="utf-8", data="x = 1\n")
+    (root / "node_modules/lib/index.js").write_text(encoding="utf-8", data="")
+    if sys.platform != "win32":
+        (root / "src/link.py").symlink_to("a.py")
+    dest = _copy_project(root, ["node_modules"])
+    try:
+        names = {p.name for p in dest.iterdir()}
+        assert names >= {"src", "node_modules"} and not names & {".git", ".sdd", "pkg.egg-info"}
+        assert (dest / "node_modules").is_symlink()
+        if sys.platform != "win32":
+            assert (dest / "src/link.py").is_symlink()
+    finally:
+        import shutil
+        shutil.rmtree(dest.parent, ignore_errors=True)
+
+
+def test_pasta_com_nome_de_codigo_nao_quebra(tmp_path):
+    project(tmp_path, FORTE)
+    (tmp_path / "src/pasta.py").mkdir()
+    (tmp_path / "src/LEIAME.md").write_text(encoding="utf-8", data="a > b\n")
+    r = mutate(tmp_path)
+    assert r.exit_code == 0, r.output
+    assert "LEIAME" not in r.output

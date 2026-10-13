@@ -16,6 +16,7 @@ CONFIG_PATH = "specs/sdd.yaml"
 DECISIONS_PATH = "specs/decisions.yaml"
 ARCH_PATH = "specs/architecture.yaml"
 FEATURES_GLOB = "specs/features/*/spec.yaml"
+PLACEHOLDER = "PREENCHER"  # marcador do esqueleto gerado por `sdd specify`
 # ID de critério dentro do nome de um teste. Aceita as convenções reais de cada ecossistema:
 #   test_ac_001_x (pytest) · "AC-001 cria" (jest/vitest) · TestAC_001_X e TestAC001X (Go,
 #   onde o prefixo Test é obrigatório) · testAC001 / shouldX_AC_001 (JUnit) · Sub/AC-003_x.
@@ -95,6 +96,9 @@ def load(root: Path) -> Project:
         proj.errors.append(f"nenhuma spec em {FEATURES_GLOB}")
     for f in files:
         rel = f.relative_to(root).as_posix()
+        for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            if PLACEHOLDER + ":" in line:  # o esqueleto sempre usa "PREENCHER: ..."; prosa não conta
+                proj.errors.append(f"{rel}:{n}: campo ainda marcado com {PLACEHOLDER}: {line.strip()}")
         try:
             proj.specs[rel] = Spec.model_validate(_load_yaml(f))
         except ValidationError as exc:

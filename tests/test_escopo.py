@@ -115,3 +115,20 @@ def test_ac_028_substituta_inexistente_e_erro(tmp_path):
     bad = copy.deepcopy(DECISIONS)
     bad["decisions"][0]["superseded_by"] = "AD-099"
     assert "superseded_by AD-099 inexistente" in project(tmp_path, spec(), bad)
+
+
+def test_ac_023_feature_large_pode_alterar_muitos_arquivos(tmp_path):
+    git(tmp_path, "init", "-q", "-b", "main")
+    write(tmp_path, "specs/sdd.yaml", "tests: {command: 'true', junit: x}\ncode: ['src/**']\n")
+    s = spec(size="large", paths=["src/pedidos/**"])
+    s["design"] = None
+    s.pop("design")
+    write(tmp_path, "specs/features/FEATURE-001/spec.yaml", yaml.safe_dump(s))
+    commit(tmp_path, "base")
+    git(tmp_path, "checkout", "-qb", "pr")
+    for i in range(4):
+        write(tmp_path, f"src/pedidos/m{i}.py", "x = 1\n")
+    write(tmp_path, "specs/features/FEATURE-001/spec.yaml", yaml.safe_dump({**s, "version": 2}))
+    commit(tmp_path)
+    r = runner.invoke(app, ["diff", "-b", "main", "-C", str(tmp_path)])
+    assert "marcada como small" not in r.output + r.stderr

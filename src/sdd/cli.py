@@ -27,6 +27,30 @@ def init(root: Path = Root):
         typer.echo(f"criado   {rel}")
 
 
+@app.command()
+def specify(
+    name: str = typer.Argument(..., help="Nome da feature (minúsculas e hífen), ex.: criar-pedido."),
+    size: str = typer.Option("medium", "--size", "-s", help="small | medium | large | complex"),
+    acs: int = typer.Option(1, "--acs", help="Quantos critérios de aceitação gerar."),
+    root: Path = Root,
+):
+    """Cria o esqueleto de uma spec com IDs livres e as seções que o size exige.
+
+    Os campos a preencher levam o marcador PREENCHER; o `sdd validate` reprova até
+    todos serem substituídos por conteúdo real.
+    """
+    from .specify import SpecifyError, create
+
+    try:
+        path, ids = create(root, name, size, acs)
+    except SpecifyError as exc:
+        typer.echo(f"ERRO  {exc}", err=True)
+        raise typer.Exit(2)
+    typer.echo(f"criado   {path.relative_to(root).as_posix()}")
+    typer.echo("IDs      " + "  ".join(f"{k}: {v}" for k, v in ids.items()))
+    typer.echo(f"\nPróximo passo: troque cada {core.PLACEHOLDER} por conteúdo real e rode `sdd validate`.")
+
+
 def _load_or_exit(root: Path) -> core.Project:
     proj = core.load(root)
     if proj.errors:
