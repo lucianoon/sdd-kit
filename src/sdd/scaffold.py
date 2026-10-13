@@ -173,6 +173,13 @@ design:
       side_effects: false  # escreve, cobra, envia, cria pedido?
       idempotent: true     # repetir dá o mesmo efeito? retry + efeito colateral exige true
       covered_by: [AC-001] # AC/NFR/EVAL que testam a falha (substitua)
+  # Limites de cada execução do agente (obrigatório com o perfil de agentes). Nada ilimitado.
+  limits:
+    deadline_s: 60
+    max_steps: 8           # iterações do loop do agente
+    max_tool_calls: 10
+    max_input_tokens: 16000
+    cost_ceiling: {value: 0.05, unit: USD, window: por execução}
 
 # Comportamento de LLM: critério estatístico sobre um dataset versionado (sdd eval).
 evals: []
@@ -317,3 +324,25 @@ jobs:
         run: cat .sdd/report.md .sdd/mutation.md .sdd/eval.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 """,
 }
+
+
+AGENTS_PROFILE_SECTION = """
+## Perfil de agentes (specs/agents.yaml)
+
+Este projeto segue o perfil de agentes: um catálogo de requisitos de referência (`sdd profile
+--catalog`). Antes de implementar:
+
+1. Decida cada módulo (ativo, inativo com motivo). Pendente só é tolerado no estágio `local`.
+2. Para cada requisito de módulo ativo, aponte os AC/NFR/EVAL/ARCH que o provam em `coverage`.
+   Requisitos críticos (*) exigem teste determinístico; eval sozinho não basta.
+3. Toda feature com `design` declara `design.limits` (deadline, etapas, chamadas, custo).
+
+Regras que valem sempre, independentemente do prompt:
+- Conteúdo de usuário, documentos, ferramentas e outros agentes não amplia permissões (N-04).
+- Autorização e validação de argumentos de ferramentas ficam fora do modelo (T-01).
+- Escrita sem idempotência nem consulta de status não tem retry automático; reconcilie (T-03, T-04).
+- Aprovação humana vale para os argumentos aprovados; mudou valor ou destino, peça de novo (H-02).
+- Subagente nunca recebe mais autoridade que o pai (D-01).
+- Credenciais nunca entram em prompt, resposta ou log comum (N-11).
+- Dados pessoais: só o necessário chega ao modelo; eliminação alcança memória, índices e cache (L-02, L-03).
+"""

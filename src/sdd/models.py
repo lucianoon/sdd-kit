@@ -19,6 +19,8 @@ class Acceptance(Strict):
     given: str
     when: str
     then: str
+    # O que NÃO pode acontecer neste cenário (efeitos proibidos). O teste do AC deve verificá-los.
+    forbidden: list[str] = []
 
 
 class Requirement(Strict):
@@ -119,15 +121,42 @@ class Dependency(Strict):
     fallback: str = Field(min_length=1)  # o que acontece quando esgota; "nenhum: <motivo>" é válido
     side_effects: bool  # escreve, cobra, envia, cria pedido...
     idempotent: bool  # repetir a operação produz o mesmo resultado?
+    # Dá para consultar se uma escrita enviada foi efetivada? (timeout após envio = resultado
+    # desconhecido; com consulta de status, repete-se só o que comprovadamente não ocorreu)
+    status_query: bool = False
+    reconciliation: str = ""  # como resolver resultado desconhecido sem idempotência nem consulta
     covered_by: list[str] = Field(min_length=1)  # AC/NFR/EVAL desta spec que testam a falha
 
     @model_validator(mode="after")
     def _retry_seguro(self):
-        if self.retry.max_attempts > 1 and self.side_effects and not self.idempotent:
+        unsafe = self.side_effects and not self.idempotent
+        if self.retry.max_attempts > 1 and unsafe and not self.status_query:
             raise ValueError(
-                "retry em operação com efeito colateral e não idempotente pode duplicar a "
-                "transação: torne-a idempotente (ex.: chave de idempotência) ou use max_attempts: 1")
+                "retry em operação com efeito colateral, não idempotente e sem consulta de status "
+                "pode duplicar a transação: torne-a idempotente (chave de idempotência), declare "
+                "status_query: true ou use max_attempts: 1")
+        if unsafe and not self.status_query and not self.reconciliation.strip():
+            raise ValueError(
+                "escrita não idempotente e sem consulta de status: um timeout após o envio deixa o "
+                "resultado desconhecido; declare `reconciliation` (como e quem resolve)")
         return self
+
+
+class CostCeiling(Strict):
+    value: float = Field(gt=0)
+    unit: str = Field(min_length=1)  # BRL, USD, tokens, GPU-s...
+    window: str = Field(min_length=1)  # por execução, por dia, por tenant/mês...
+
+
+class Limits(Strict):
+    """Limites de cada unidade de trabalho do agente (N-03, N-07). Nada ilimitado."""
+    deadline_s: int = Field(ge=1)
+    max_steps: int = Field(ge=1)  # iterações do loop do agente
+    max_tool_calls: int = Field(ge=0)
+    max_input_tokens: int | None = Field(None, ge=1)
+    max_output_tokens: int | None = Field(None, ge=1)
+    concurrency: int | None = Field(None, ge=1)  # execuções simultâneas por principal/tenant
+    cost_ceiling: CostCeiling | None = None
 
 
 class Design(Strict):
@@ -137,6 +166,8 @@ class Design(Strict):
     risks: list[Risk] = Field(min_length=1)
     # Obrigatório declarar, mesmo vazio: `dependencies: []` afirma que não há dependência externa.
     dependencies: list[Dependency]
+    # Obrigatório quando o projeto usa o perfil de agentes (specs/agents.yaml).
+    limits: Limits | None = None
 
     @model_validator(mode="after")
     def _uma_escolhida(self):
@@ -178,11 +209,16 @@ class Eval(Strict):
     max_run_spread: float | None = Field(None, ge=0)  # maior - menor valor entre execuções
     use_lower_bound: bool = False  # compara o limite inferior do IC 95% (Wilson), não a média
     judge: Literal["deterministic", "llm"] = "deterministic"
+    # Crítico: um único caso falho em qualquer execução reprova (ex.: violação de autorização),
+    # independentemente da média. Só para pass_rate.
+    critical: bool = False
 
     @model_validator(mode="after")
     def _coerencia(self):
         if self.use_lower_bound and self.aggregate != "pass_rate":
             raise ValueError("use_lower_bound só vale para aggregate: pass_rate")
+        if self.critical and self.aggregate != "pass_rate":
+            raise ValueError("critical só vale para aggregate: pass_rate")
         return self
 
 
@@ -210,6 +246,54 @@ class ArchRule(BaseModel):
 
 class Architecture(Strict):
     rules: list[ArchRule] = []
+
+
+# --- Perfil de agentes: catálogo de referência e matriz do projeto -----------------
+
+class CatalogRequirement(Strict):
+    id: str = Field(pattern=r"^[A-Z]-\d{2,}$")
+    title: str
+    requirement: str
+    evidence: str
+    critical: bool = False
+
+
+class CatalogModule(Strict):
+    name: str
+    activate_when: str = ""
+    mandatory: bool = False
+    requirements: list[CatalogRequirement] = Field(min_length=1)
+
+
+class Catalog(Strict):
+    profile: str
+    version: str
+    modules: dict[str, CatalogModule]
+
+
+ModuleStatus = Literal["ativo", "inativo", "pendente"]
+
+
+class ModuleState(Strict):
+    status: ModuleStatus
+    reason: str = ""
+
+
+class NotApplicable(Strict):
+    not_applicable: str = Field(min_length=1)
+
+
+class AgentsProfile(Strict):
+    """specs/agents.yaml: quais módulos se aplicam e o que prova cada requisito."""
+    profile: Literal["agentes"]
+    # local: pendências viram aviso. piloto/producao: pendência reprova; producao exige módulo P.
+    stage: Literal["local", "piloto", "producao"] = "local"
+    modules: dict[str, ModuleStatus | ModuleState]
+    coverage: dict[str, list[str] | NotApplicable] = {}
+
+    def state(self, key: str) -> ModuleState | None:
+        v = self.modules.get(key)
+        return ModuleState(status=v) if isinstance(v, str) else v
 
 
 # --- Escopo: premissas, perguntas, decisões -------------------------------------
@@ -274,7 +358,8 @@ class Spec(Strict):
 
     def criteria(self) -> list[tuple[str, str, str]]:
         """(id, origem, descrição) de tudo que exige evidência de teste."""
-        out = [(a.id, r.id, a.then) for r in self.requirements for a in r.acceptance]
+        out = [(a.id, r.id, a.then + (f" — proibido: {'; '.join(a.forbidden)}" if a.forbidden else ""))
+               for r in self.requirements for a in r.acceptance]
         if self.design:
             out += [(n.id, "design", n.describe()) for n in self.design.numbers if n.id]
         return out

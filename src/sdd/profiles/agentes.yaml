@@ -1,0 +1,314 @@
+# Catálogo de requisitos de referência para aplicações de agentes de IA.
+# Origem: SPEC-BASE v0.1 (Luciano Oliveira Nunes, 13/10/2026), condensada; módulo L acrescentado.
+# Um projeto declara em specs/agents.yaml quais módulos estão ativos e, para cada requisito
+# ativo, os IDs (AC, NFR, EVAL, ARCH) que provam o requisito, ou "não se aplica" com motivo.
+# critical: true -> não aceita "não se aplica" e exige ao menos uma evidência determinística
+# (AC, NFR ou ARCH); eval sozinho não basta.
+profile: agentes
+version: "0.1"
+modules:
+  N:
+    name: Núcleo
+    mandatory: true
+    activate_when: Toda aplicação de agentes (não pode ser desativado; pode ser simples).
+    requirements:
+      - id: N-01
+        title: Escopo
+        requirement: Definir tarefas suportadas, resultados válidos e limites de autonomia.
+        evidence: Caso suportado conclui; caso fora do escopo recebe o comportamento definido.
+      - id: N-02
+        title: Contratos
+        requirement: Validar entradas e saídas segundo schemas ou critérios explícitos.
+        evidence: Entrada inválida não inicia efeitos; saída inválida não é aceita como sucesso.
+      - id: N-03
+        title: Execução limitada
+        requirement: Cada unidade de trabalho tem run_id, estado, deadline e limite de trabalho/custo.
+        evidence: Loop, crescimento de contexto e chamadas excessivas terminam controladamente.
+      - id: N-04
+        title: Confiança
+        critical: true
+        requirement: Conteúdo de usuário, fontes, ferramentas e outros agentes não amplia permissões nem políticas.
+        evidence: Instrução externa conflitante não revela segredos nem libera ações.
+      - id: N-05
+        title: Validação de resultado
+        requirement: Verificar o resultado conforme o tipo de tarefa antes de marcá-lo como sucesso.
+        evidence: Teste diferencia resultado correto de texto apenas plausível.
+      - id: N-06
+        title: Falhas
+        requirement: Definir recusa, erro, cancelamento e conclusão parcial; limitar tentativas.
+        evidence: Falha de dependência não produz retry infinito nem falso sucesso.
+      - id: N-07
+        title: Recursos
+        requirement: Controlar tamanho, tokens, etapas, duração e concorrência.
+        evidence: Saturação resulta em admissão limitada ou rejeição definida.
+      - id: N-08
+        title: Evidência operacional
+        requirement: Correlacionar entrada, decisões, chamadas, resultado, versões e consumo com exposição mínima de dados.
+        evidence: Uma falha é reconstruída a partir dos registros autorizados (teste sobre o registro gerado).
+      - id: N-09
+        title: Avaliação
+        requirement: Manter casos representativos e critérios de release para mudanças de comportamento.
+        evidence: Regressão definida bloqueia promoção de versão (eval com dataset versionado).
+      - id: N-10
+        title: Versionamento
+        requirement: Identificar workflow, prompts, políticas, modelos e contratos usados em cada execução.
+        evidence: Resultado é associado à configuração efetivamente executada.
+      - id: N-11
+        title: Segredos
+        critical: true
+        requirement: Credenciais não aparecem em prompts, resultados ou logs comuns.
+        evidence: Cenários de extração não encontram credenciais acessíveis ao modelo.
+      - id: N-12
+        title: Ciclo dos dados
+        requirement: Definir armazenamento, retenção, acesso e descarte dos dados da aplicação.
+        evidence: Contexto efêmero não persiste; dados retidos obedecem à política configurada.
+  A:
+    name: Identidade, autorização e isolamento
+    activate_when: Há acesso restrito, dados privados, usuários, equipes ou tenants.
+    requirements:
+      - id: A-01
+        title: Identidade confiável
+        critical: true
+        requirement: Derivar identidade de credencial ou contexto confiável e autorizar por recurso e ação.
+        evidence: Identidade declarada no texto livre não é aceita.
+      - id: A-02
+        title: Propagação de escopo
+        critical: true
+        requirement: Propagar escopo para banco, memória, recuperação, cache, ferramentas e delegação.
+        evidence: Dois principais/tenants com dados semelhantes não acessam resultados um do outro.
+      - id: A-03
+        title: Sem enumeração
+        requirement: Mensagens de erro não expõem nem permitem enumerar recursos.
+        evidence: Recurso alheio e inexistente produzem a mesma resposta.
+      - id: A-04
+        title: Revogação
+        requirement: Revogação de acesso impede novas leituras e ações, inclusive em execuções retomadas.
+        evidence: Remoção de permissão afeta a execução conforme a política declarada.
+  T:
+    name: Ferramentas, código e efeitos externos
+    activate_when: O agente chama APIs, executa código ou altera estado externo.
+    requirements:
+      - id: T-01
+        title: Autorização fora do modelo
+        critical: true
+        requirement: Validar argumentos e autorização fora do modelo, com allowlist de capacidades.
+        evidence: Argumento fabricado pelo modelo não aumenta autoridade.
+      - id: T-02
+        title: Classificação de efeitos
+        requirement: Classificar efeito, risco, limites, necessidade de confirmação e recuperação de cada ferramenta.
+        evidence: Toda ferramenta declarada em design.dependencies com efeito, timeout, retry e fallback.
+      - id: T-03
+        title: Escrita sem duplicidade
+        critical: true
+        requirement: Escritas usam idempotência no destino ou reconciliação explícita; não prometer exactly-once sem suporte externo.
+        evidence: Crash depois do envio não duplica a ação.
+      - id: T-04
+        title: Resultado desconhecido
+        requirement: Timeout após envio é resultado desconhecido; consultar status antes de repetir ou suspender o retry e reconciliar.
+        evidence: Timeout em escrita não gera segunda execução sem consulta de status.
+      - id: T-05
+        title: Isolamento de execução de código
+        requirement: Execução de código isola filesystem, rede e recursos na medida das permissões necessárias.
+        evidence: Código executado não acessa recursos fora do seu escopo.
+  R:
+    name: Conhecimento e recuperação
+    activate_when: Usa documentos ou fontes para fundamentar respostas.
+    requirements:
+      - id: R-01
+        title: Procedência
+        requirement: Registrar fonte, versão, escopo e procedência do contexto utilizado.
+        evidence: Resposta referencia as fontes efetivamente usadas.
+      - id: R-02
+        title: Acesso na recuperação
+        requirement: Definir quando recuperar, como filtrar por acesso e qual evidência basta para responder.
+        evidence: Documento sem permissão não entra no contexto.
+      - id: R-03
+        title: Propagação de mudanças
+        requirement: Atualização, exclusão e revogação se propagam aos índices e resultados dependentes.
+        evidence: Fonte revogada não sustenta resposta antiga.
+      - id: R-04
+        title: Sem citação inventada
+        requirement: Ausência, insuficiência ou conflito de fontes tem comportamento explícito.
+        evidence: Conjunto sem cobertura aciona recusa ou limitação esperada.
+  M:
+    name: Memória
+    activate_when: Contexto é retido entre unidades de trabalho.
+    requirements:
+      - id: M-01
+        title: Camadas de memória
+        requirement: Separar contexto de execução, histórico e memória persistente, com finalidade e escopo.
+        evidence: Memória de outro principal não entra na execução.
+      - id: M-02
+        title: Gravação controlada
+        requirement: Definir o que pode ser gravado, por quem, com qual confiança, TTL, correção e exclusão.
+        evidence: Exclusão de memória funciona e é verificada.
+      - id: M-03
+        title: Proveniência
+        requirement: Resumos e fatos extraídos mantêm proveniência e não viram regra de sistema.
+        evidence: Fato extraído de texto não confiável não altera políticas.
+      - id: M-04
+        title: Compactação segura
+        requirement: Compactação preserva restrições, estado operacional e referências essenciais.
+        evidence: Compactação não perde uma aprovação nem inventa uma ação realizada.
+  H:
+    name: Participação humana
+    activate_when: Há revisão, aprovação ou transferência para pessoas.
+    requirements:
+      - id: H-01
+        title: Gatilhos
+        requirement: Definir gatilhos de revisão, aprovação ou transferência e o contexto mínimo para decidir.
+        evidence: Caso que exige aprovação para antes da ação.
+      - id: H-02
+        title: Aprovação vinculada
+        critical: true
+        requirement: Aprovação vale para objeto, argumentos, identidade e política; mudança relevante invalida a aprovação.
+        evidence: Alterar destinatário, valor ou objeto exige nova decisão.
+      - id: H-03
+        title: Persistência da decisão
+        requirement: Persistir solicitação e decisão quando prometida continuidade; evitar pedidos duplicados.
+        evidence: Retomada não repete a solicitação já respondida.
+      - id: H-04
+        title: Sem resposta humana
+        requirement: Definir comportamento sem resposta e revalidar autorização na retomada.
+        evidence: Expiração produz o resultado definido.
+  J:
+    name: Tarefas longas e eventos
+    activate_when: O trabalho excede o prazo interativo ou exige retomada.
+    requirements:
+      - id: J-01
+        title: Admissão separada
+        requirement: Separar admissão de execução e oferecer consulta ou entrega do resultado.
+        evidence: Requisição retorna identificador consultável.
+      - id: J-02
+        title: Entrega e deduplicação
+        requirement: Definir entrega, deduplicação, tentativas, lease, timeout, fila de falhas e cancelamento.
+        evidence: Entrega repetida não duplica trabalho publicado.
+      - id: J-03
+        title: Retomada reconciliável
+        requirement: Checkpoints e efeitos são reconciliáveis após interrupção.
+        evidence: Worker morto é detectado e o trabalho retomado sem duplicar efeitos.
+      - id: J-04
+        title: Backlog limitado
+        requirement: Limitar espera e backlog; fila não resolve capacidade insuficiente.
+        evidence: Saturação respeita a política de admissão.
+  D:
+    name: Delegação e múltiplos agentes
+    activate_when: Agentes ou serviços autônomos recebem subtarefas.
+    requirements:
+      - id: D-01
+        title: Autoridade decrescente
+        critical: true
+        requirement: Subtarefas têm objetivo, contrato, deadline e autoridade iguais ou menores que os do pai.
+        evidence: Permissão restrita do pai permanece restrita no filho.
+      - id: D-02
+        title: Limites globais
+        requirement: Limites compartilhados de custo, profundidade, mensagens e concorrência.
+        evidence: Ciclo de delegação encerra dentro do orçamento.
+      - id: D-03
+        title: Validação pelo coordenador
+        requirement: Coordenador valida resultados e resolve conflitos; consenso não comprova correção.
+        evidence: Resultado inválido de subagente não é aceito.
+      - id: D-04
+        title: Responsabilidade
+        requirement: Registrar relação pai/filho e atribuir cada efeito a um executor responsável.
+        evidence: Dois agentes não executam a mesma escrita sem coordenação.
+  X:
+    name: Arquivos e modalidades
+    activate_when: Entrada ou saída inclui arquivos, imagens, áudio ou vídeo.
+    requirements:
+      - id: X-01
+        title: Restrição de entrada
+        requirement: Restringir formato, tamanho e duração; validar conteúdo real além da extensão.
+        evidence: Arquivo inválido ou excessivo é rejeitado.
+      - id: X-02
+        title: Conteúdo não é instrução
+        requirement: Separar conteúdo extraído de instruções confiáveis, preservando procedência.
+        evidence: Instrução embutida em arquivo não é executada.
+      - id: X-03
+        title: Qualidade de extração
+        requirement: Definir qualidade mínima de extração e tratamento de material ilegível.
+        evidence: Extração insuficiente não gera fato apresentado como confirmado.
+      - id: X-04
+        title: Artefatos temporários
+        requirement: Armazenamento temporário e derivados obedecem à política de dados.
+        evidence: Temporários são descartados conforme a política.
+  C:
+    name: Cache
+    activate_when: Reutilização é segura e tem benefício medido.
+    requirements:
+      - id: C-01
+        title: Elegibilidade e invalidação
+        requirement: Definir elegibilidade, escopo, dependências, expiração e invalidação por tipo de cache.
+        evidence: Mudança de fonte invalida a entrada.
+      - id: C-02
+        title: Sem reuso entre identidades
+        requirement: Não reutilizar resultados pessoais entre identidades nem efeitos de ações.
+        evidence: Usuário B não recebe resposta em cache do usuário A.
+      - id: C-03
+        title: Cache semântico avaliado
+        requirement: Cache semântico exige avaliação de equivalência; similaridade não é probabilidade de acerto.
+        evidence: Perguntas parecidas com respostas diferentes não compartilham resultado.
+      - id: C-04
+        title: Permissões atuais
+        requirement: Resposta reutilizada continua sujeita às permissões e políticas atuais.
+        evidence: Revogação impede acesso a resposta em cache.
+  P:
+    name: Produção, confiabilidade e escala
+    activate_when: Exposição a usuários reais, SLA ou volume relevante (obrigatório no estágio producao).
+    requirements:
+      - id: P-01
+        title: SLOs
+        requirement: SLOs por classe de tarefa, capacidade de pico e limites de dependências.
+        evidence: NFRs com números e fonte; teste de carga no pico declarado.
+      - id: P-02
+        title: Dimensões de escala
+        requirement: Distinguir escala de compute, armazenamento, concorrência e cotas de inferência.
+        evidence: Cota de inferência esgotada tem comportamento definido.
+      - id: P-03
+        title: Resiliência
+        requirement: Timeout, retry com backoff, circuit breaker quando necessário e degradação explícita.
+        evidence: Falha de dependência exercitada em teste.
+      - id: P-04
+        title: Fallback avaliado
+        requirement: Fallback preserva políticas, contratos e restrições de dados e passa pelos mesmos evals.
+        evidence: Modelo de fallback roda o mesmo conjunto de avaliação.
+      - id: P-05
+        title: Rollout e recuperação
+        requirement: Rollout gradual, rollback e recuperação de dados conforme as metas.
+        evidence: Restore e rollback demonstrados, não apenas descritos.
+  L:
+    name: Proteção de dados e regulação (LGPD, PL 2338)
+    activate_when: >-
+      Trata dados pessoais de titulares no Brasil ou toma decisões que os afetam. Referência
+      técnica de engenharia, não parecer jurídico; confirme com o jurídico e verifique a
+      situação vigente do PL 2338/2023.
+    requirements:
+      - id: L-01
+        title: Finalidade e base legal
+        requirement: Cada tratamento de dado pessoal tem finalidade e base legal registradas (LGPD art. 6º e 7º).
+        evidence: Registro de operações (art. 37) com finalidade e base legal por fluxo.
+      - id: L-02
+        title: Minimização no contexto do modelo
+        requirement: Prompts, contexto, logs e memória recebem só os dados pessoais necessários à finalidade.
+        evidence: Campo pessoal fora da finalidade é removido ou mascarado antes de chegar ao modelo.
+      - id: L-03
+        title: Direitos do titular
+        critical: true
+        requirement: Acesso, correção e eliminação alcançam banco, memória, índices de recuperação, cache e logs.
+        evidence: Eliminação do titular remove seus dados de todos os armazenamentos declarados.
+      - id: L-04
+        title: Revisão de decisão automatizada
+        requirement: Decisões automatizadas que afetam interesses do titular admitem revisão e informam critérios (LGPD art. 20).
+        evidence: Pedido de revisão é encaminhado e a explicação dos critérios é gerada.
+      - id: L-05
+        title: Avaliação de impacto
+        requirement: Tratamento de alto risco tem relatório de impacto (RIPD) e avaliação de risco do sistema de IA.
+        evidence: Documento referenciado em decisions.yaml antes do estágio piloto.
+      - id: L-06
+        title: Transferência internacional
+        requirement: Envio de dados pessoais a provedor de modelo fora do Brasil tem base legal para transferência (art. 33).
+        evidence: Provedor, região e mecanismo de transferência registrados como decisão.
+      - id: L-07
+        title: Incidentes
+        requirement: Vazamento ou acesso indevido é detectável e segue o procedimento de comunicação definido.
+        evidence: Evento de acesso indevido gera alerta e registro.

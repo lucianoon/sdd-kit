@@ -10,6 +10,8 @@ rules:
       - src/sdd/mutation.py
       - src/sdd/procs.py
       - src/sdd/textscan.py
+      - src/sdd/profile.py
+      - src/sdd/specify.py
     forbid: [typer, click]
     forbid_paths: [src/sdd/cli]
   - id: ARCH-002

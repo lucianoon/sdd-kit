@@ -200,7 +200,23 @@ def test_ac_050_retry_em_efeito_colateral_nao_idempotente(tmp_path):
 
 
 def test_ac_050_sem_retry_nao_precisa_de_idempotencia(tmp_path):
-    assert spec_with_deps(tmp_path, [dep(idempotent=False, retry={"max_attempts": 1})]) == ""
+    d = dep(idempotent=False, retry={"max_attempts": 1}, reconciliation="conciliação diária com o extrato")
+    assert spec_with_deps(tmp_path, [d]) == ""
+
+
+def test_ac_070_escrita_sem_idempotencia_nem_status_exige_reconciliacao(tmp_path):
+    e = spec_with_deps(tmp_path, [dep(idempotent=False, retry={"max_attempts": 1})])
+    assert "declare `reconciliation`" in e
+
+
+def test_ac_070_consulta_de_status_permite_retry_sem_idempotencia(tmp_path):
+    d = dep(idempotent=False, status_query=True, retry={"max_attempts": 3})
+    assert spec_with_deps(tmp_path, [d]) == ""
+
+
+def test_ac_070_leitura_nao_exige_reconciliacao(tmp_path):
+    d = dep(side_effects=False, idempotent=False, retry={"max_attempts": 3})
+    assert spec_with_deps(tmp_path, [d]) == ""
 
 
 def test_ac_051_covered_by_inexistente(tmp_path):

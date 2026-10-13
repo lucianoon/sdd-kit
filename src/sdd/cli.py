@@ -15,9 +15,23 @@ Root = typer.Option(Path("."), "--root", "-C", help="Raiz do projeto.")
 
 
 @app.command()
-def init(root: Path = Root):
+def init(
+    root: Path = Root,
+    profile: str = typer.Option(None, "--profile", "-p",
+                                help="Perfil de requisitos de referência (disponível: agentes)."),
+):
     """Cria a estrutura specs/, AGENTS.md e o workflow de CI (não sobrescreve)."""
-    for rel, content in FILES.items():
+    files = dict(FILES)
+    if profile is not None:
+        from .profile import AGENTS_PATH, skeleton
+        from .scaffold import AGENTS_PROFILE_SECTION
+
+        if profile != "agentes":
+            typer.echo(f"ERRO  perfil '{profile}' não existe (disponível: agentes)", err=True)
+            raise typer.Exit(2)
+        files[AGENTS_PATH] = skeleton(profile)
+        files["AGENTS.md"] = files["AGENTS.md"] + AGENTS_PROFILE_SECTION
+    for rel, content in files.items():
         p = root / rel
         if p.exists():
             typer.echo(f"mantido  {rel}")
@@ -53,6 +67,8 @@ def specify(
 
 def _load_or_exit(root: Path) -> core.Project:
     proj = core.load(root)
+    for w in proj.warnings:
+        typer.echo(f"AVISO {w}")
     if proj.errors:
         for e in proj.errors:
             typer.echo(f"ERRO  {e}", err=True)
@@ -173,6 +189,42 @@ def mutate(
     ok = all(r.ok for r in reports)
     typer.echo(f"\n{'APROVADO' if ok else 'REPROVADO'} — relatório em {d / 'mutation.md'}")
     raise typer.Exit(0 if ok else 1)
+
+
+@app.command(name="profile")
+def profile_cmd(
+    root: Path = Root,
+    show_catalog: bool = typer.Option(False, "--catalog", help="Lista o catálogo completo de requisitos."),
+):
+    """Mostra a matriz do perfil de agentes: módulos, requisitos e evidências declaradas."""
+    from .profile import AGENTS_PATH, catalog, matrix
+
+    if show_catalog:
+        for key, mod in catalog().modules.items():
+            typer.echo(f"\n{key} — {mod.name}{' (obrigatório)' if mod.mandatory else ''}")
+            typer.echo(f"   ative quando: {' '.join(mod.activate_when.split())}")
+            for r in mod.requirements:
+                typer.echo(f"   {r.id}{'*' if r.critical else ' '} {r.title}: {r.requirement}")
+                typer.echo(f"         evidência: {r.evidence}")
+        typer.echo("\n(*) crítico: exige AC, NFR ou ARCH e não aceita not_applicable")
+        raise typer.Exit(0)
+    proj = core.load(root)
+    if proj.agents is None:
+        typer.echo(f"ERRO  {AGENTS_PATH} ausente ou inválido (crie com `sdd init --profile agentes`)", err=True)
+        for e in proj.errors:
+            typer.echo(f"ERRO  {e}", err=True)
+        raise typer.Exit(2)
+    typer.echo(f"estágio: {proj.agents.stage}")
+    for r in matrix(proj, proj.agents, {}):
+        ev = ", ".join(e["id"] for e in r["evidence"])
+        star = "*" if r["critical"] else " "
+        state = "DECLARADO" if r["state"] == "COBERTO" else r["state"]
+        typer.echo(f"  {r['id']}{star} {state:<14} {r['title']}" + (f"  [{ev}]" if ev else ""))
+    for w in proj.warnings:
+        typer.echo(f"AVISO {w}")
+    for e in proj.errors:
+        typer.echo(f"ERRO  {e}", err=True)
+    raise typer.Exit(1 if proj.errors else 0)
 
 
 @app.command(name="arch")

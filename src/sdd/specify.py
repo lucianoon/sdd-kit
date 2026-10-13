@@ -52,7 +52,8 @@ def _design_required(root: Path, size: str) -> bool:
     return bool(cfg.get("require_design")) and size in cfg.get("design_required_for", ["large", "complex"])
 
 
-def render(name: str, size: str, acs: int, ids: dict[str, int], with_design: bool) -> str:
+def render(name: str, size: str, acs: int, ids: dict[str, int], with_design: bool,
+           with_limits: bool = False) -> str:
     def nid(kind: str, offset: int = 1) -> str:
         return f"{kind}-{ids[kind] + offset:03d}"
 
@@ -109,6 +110,13 @@ design:
       mitigated_by: [{nfr}]
   dependencies: []                # {P}: liste as dependências externas (timeout, retry, fallback...) ou confirme que não há
 """
+        if with_limits:
+            out += f"""  limits:                         # perfil de agentes: limites de cada execução
+    deadline_s: 0                 # {P}: prazo máximo em segundos
+    max_steps: 0                  # {P}: iterações do loop do agente
+    max_tool_calls: 0             # {P}: chamadas de ferramenta por execução
+    cost_ceiling: {{value: 0, unit: "{P}: BRL, USD, tokens", window: "{P}: por execução, por dia"}}
+"""
     out += f"""
 invariants: []
 quality_gates: []
@@ -132,7 +140,8 @@ def create(root: Path, name: str, size: str = "medium", acs: int = 1) -> tuple[P
     folder.mkdir(parents=True)
     with_design = _design_required(root, size)
     path = folder / "spec.yaml"
-    path.write_text(render(name, size, acs, ids, with_design), encoding="utf-8")
+    with_limits = with_design and (root / "specs/agents.yaml").exists()
+    path.write_text(render(name, size, acs, ids, with_design, with_limits), encoding="utf-8")
     allocated = {"REQ": f"REQ-{ids['REQ'] + 1:03d}",
                  "AC": ", ".join(f"AC-{ids['AC'] + i:03d}" for i in range(1, acs + 1))}
     if with_design:

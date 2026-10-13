@@ -82,6 +82,13 @@ def evaluate(feature: str, ev: Eval, known: set[str], results: Path) -> dict:
         lo, hi = wilson(k, n)
         extra["ci95"] = [round(lo, 4), round(hi, 4)]
 
+    if ev.critical:  # um único caso falho reprova, qualquer que seja a média
+        failed = [f"{case} (execução {run})" for run, cases in sorted(per_run.items())
+                  for case, r in cases.items() if not r["pass"]]
+        if failed:
+            shown = ", ".join(failed[:5]) + (" …" if len(failed) > 5 else "")
+            return _row(feature, ev, "FALHA_CRITICA", f"{len(failed)} caso(s) falharam: {shown}", **extra)
+
     t = ev.threshold
     low_side = lo if ev.use_lower_bound else value
     high_side = hi if ev.use_lower_bound else value

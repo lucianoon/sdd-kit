@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from .models import ArchRule, Architecture, Config, Decision, DecisionLog, Spec
+from .models import AgentsProfile, ArchRule, Architecture, Config, Decision, DecisionLog, Spec
 
 CONFIG_PATH = "specs/sdd.yaml"
 DECISIONS_PATH = "specs/decisions.yaml"
@@ -34,6 +34,8 @@ class Project:
     decisions: dict[str, Decision] = field(default_factory=dict)
     arch: list[ArchRule] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    agents: "AgentsProfile | None" = None
 
 
 def _load_yaml(path: Path):
@@ -96,9 +98,7 @@ def load(root: Path) -> Project:
         proj.errors.append(f"nenhuma spec em {FEATURES_GLOB}")
     for f in files:
         rel = f.relative_to(root).as_posix()
-        for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
-            if PLACEHOLDER + ":" in line:  # o esqueleto sempre usa "PREENCHER: ..."; prosa não conta
-                proj.errors.append(f"{rel}:{n}: campo ainda marcado com {PLACEHOLDER}: {line.strip()}")
+        proj.errors += _placeholders(rel, f.read_text(encoding="utf-8"))
         try:
             proj.specs[rel] = Spec.model_validate(_load_yaml(f))
         except ValidationError as exc:
@@ -157,7 +157,40 @@ def load(root: Path) -> Project:
             elif len(ids) < ev.min_cases:
                 proj.errors.append(
                     f"{rel}: {ev.id}: dataset tem {len(ids)} casos, menos que min_cases {ev.min_cases}")
+    _load_agents(proj)
     return proj
+
+
+def _placeholders(rel: str, text: str) -> list[str]:
+    return [f"{rel}:{n}: campo ainda marcado com {PLACEHOLDER}: {line.strip()}"
+            for n, line in enumerate(text.splitlines(), 1)
+            if PLACEHOLDER + ":" in line]  # o esqueleto sempre usa "PREENCHER: ..."; prosa não conta
+
+
+def _load_agents(proj: Project) -> None:
+    """Perfil de agentes (specs/agents.yaml), quando o projeto o adota."""
+    from .profile import AGENTS_PATH, validate as validate_profile
+
+    f = proj.root / AGENTS_PATH
+    if not f.exists():
+        return
+    text = f.read_text(encoding="utf-8")
+    proj.errors += _placeholders(AGENTS_PATH, text)
+    try:
+        proj.agents = AgentsProfile.model_validate(yaml.safe_load(text) or {})
+    except ValidationError as exc:
+        proj.errors += _fmt(AGENTS_PATH, exc)
+        return
+    except yaml.YAMLError as exc:
+        proj.errors.append(f"{AGENTS_PATH}: YAML inválido: {exc}")
+        return
+    errors, warnings = validate_profile(proj, proj.agents)
+    proj.errors += errors
+    proj.warnings += warnings
+    for rel, spec in proj.specs.items():  # N-03/N-07: todo desenho de agente declara limites
+        if spec.design and spec.design.limits is None:
+            proj.errors.append(f"{rel}: projeto com perfil de agentes: design.limits é obrigatório "
+                               "(deadline, etapas, chamadas de ferramenta, custo)")
 
 
 def dataset_ids(path: Path) -> tuple[set[str], str | None]:
@@ -283,6 +316,7 @@ def check(proj: Project) -> dict:
         "ok": not problems, "problems": problems, "criteria": rows, "gates": gates,
         "risks": risk_matrix(proj), "architecture": arch_report,
         "dependencies": dependency_matrix(proj),
+        "profile": _profile_matrix(proj, rows, arch_report),
         "tests": {"command": cfg.tests.command, "exit_code": test_rc,
                   "output": test_out if test_rc else ""},
     }
@@ -298,6 +332,17 @@ def risk_matrix(proj: Project) -> list[dict]:
                             "description": r.description, "mitigated_by": r.mitigated_by,
                             "accepted": r.accepted})
     return out
+
+
+def _profile_matrix(proj: Project, rows: list[dict], arch_report: dict) -> dict | None:
+    if proj.agents is None:
+        return None
+    from .profile import matrix
+
+    verdicts = {r["id"]: r["verdict"] for r in rows}
+    violated = {v["rule"] for v in arch_report.get("violations", [])}
+    verdicts.update({rid: ("VIOLADA" if rid in violated else "OK") for rid in arch_report.get("rules", [])})
+    return {"stage": proj.agents.stage, "requirements": matrix(proj, proj.agents, verdicts)}
 
 
 def dependency_matrix(proj: Project) -> list[dict]:
@@ -357,6 +402,19 @@ def render_markdown(report: dict) -> str:
             out.append(f"| {d['feature']} | {d['name']} ({d['kind']}) | {d['timeout_ms']} ms | "
                        f"{d['retry']['max_attempts']} | {'sim' if d['side_effects'] else 'não'} | "
                        f"{'sim' if d['idempotent'] else 'não'} | {d['fallback']} | {tested} |")
+    prof = report.get("profile")
+    if prof:
+        active = [r for r in prof["requirements"] if r["state"] not in ("INATIVO", "PENDENTE", "NÃO DECLARADO")]
+        off = sorted({f"{r['module']} ({r['state'].lower()})" for r in prof["requirements"]
+                      if r["state"] in ("INATIVO", "PENDENTE", "NÃO DECLARADO")})
+        out += ["", f"## Perfil de agentes (estágio {prof['stage']})", "",
+                "| Requisito | Estado | Evidências |", "|---|---|---|"]
+        for r in active:
+            ev = ", ".join(f"{e['id']} ({e['verdict']})" for e in r["evidence"]) or "—"
+            star = " *" if r["critical"] else ""
+            out.append(f"| {r['id']} {r['title']}{star} | {r['state']} | {ev} |")
+        if off:
+            out += ["", "Módulos fora do escopo: " + ", ".join(off) + ". (*) requisito crítico."]
     if report["problems"]:
         out += ["", "## Problemas", ""] + [f"- {p}" for p in report["problems"]]
     return "\n".join(out) + "\n"
