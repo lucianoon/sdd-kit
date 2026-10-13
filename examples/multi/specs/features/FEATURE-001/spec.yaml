@@ -1,0 +1,13 @@
+feature: pedidos
+version: 1
+size: small
+summary: Pedidos e descontos (donos de src/pedidos.py).
+requirements:
+  - id: REQ-001
+    description: Pedidos e descontos
+    acceptance:
+      - {id: AC-001, given: valor válido, when: cria, then: pedido criado}
+      - {id: AC-002, given: valor negativo, when: cria, then: erro}
+      - {id: AC-003, given: cliente VIP com 100 ou mais, when: calcula, then: 10% de desconto}
+      - {id: AC-004, given: cliente sem VIP, when: calcula, then: valor inalterado}
+paths: ["src/pedidos.py"]

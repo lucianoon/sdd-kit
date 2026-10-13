@@ -1,0 +1,17 @@
+feature: fretes
+version: 1
+size: small
+summary: Frete grátis reaproveita o limite VIP declarado em pedidos (FEATURE-001).
+assumptions:
+  - assumption: frete grátis só para VIP
+    chosen: mesma regra do desconto VIP, sem novo critério de valor
+    rationale: uma só constante evita as regras divergirem com o tempo
+requirements:
+  - id: REQ-201
+    description: Frete com base na regra VIP de pedidos
+    acceptance:
+      - {id: AC-201, given: pedido VIP acima do limite, when: calcula frete, then: frete grátis}
+      - {id: AC-202, given: pedido VIP abaixo do limite, when: calcula frete, then: tabela por peso}
+      - {id: AC-203, given: pedido sem VIP, when: calcula frete, then: tabela por peso}
+      - {id: AC-204, given: peso acima de 5 kg, when: calcula frete, then: peso excedente é cobrado por kg}
+paths: ["src/fretes.py"]

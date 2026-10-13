@@ -1,0 +1,6 @@
+tests:
+  # Mesmo runner (pytest) para as duas features; cada AC é reconhecido pelo ID no nome
+  # do teste, e os IDs não se repetem entre specs (AC-1xx é do pedido, AC-2xx é do frete).
+  command: "python -m pytest -q --junitxml=.sdd/junit.xml"
+  junit: .sdd/junit.xml
+code: ["src/**"]

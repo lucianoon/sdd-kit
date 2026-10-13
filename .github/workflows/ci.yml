@@ -63,6 +63,9 @@ jobs:
       - name: pytest
         working-directory: examples/pytest
         run: sdd check
+      - name: multi (2 features)
+        working-directory: examples/multi
+        run: sdd check
       - name: jest
         working-directory: examples/jest
         run: npm ci && sdd check

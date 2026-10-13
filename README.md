@@ -20,7 +20,8 @@ comportamento de LLM é medido com critério estatístico. Nenhuma aprovação d
 ## Instalação
 
 ```bash
-pipx install git+https://github.com/lucianoon/sdd-kit
+pipx install sdd-kit-ai                                  # do PyPI
+pipx install git+https://github.com/lucianoon/sdd-kit    # da fonte, sempre atualizado
 ```
 
 Python 3.10+. Funciona com qualquer linguagem cujo runner de testes gere JUnit XML
@@ -66,6 +67,17 @@ sdd init --preset completo    # + evals, mutação, critério estrito
 sdd enable design tasks       # liga camadas num projeto existente
 sdd enable agentes            # perfil de agentes de IA (61 requisitos, incluindo LGPD)
 ```
+
+## Aplicações de agentes de IA
+
+`sdd enable agentes` (ou `sdd init --profile agentes`) traz um catálogo de requisitos de
+referência para agentes, derivado da *SPEC-BASE v0.1*: 12 módulos (núcleo, ferramentas e
+efeitos, recuperação, memória, humano no laço, delegação, produção, LGPD/PL 2338...),
+61 requisitos. Cada requisito ativo é cobrado por evidência — um AC ou NFR com teste
+passando, uma regra ARCH executável ou um EVAL com critério estatístico — ou justificado
+com `not_applicable` + motivo; "acho que cobre" não satisfaz. O `sdd profile` mostra a
+matriz com o estado real de cada evidência. Detalhes e tabela completa em
+[`docs/agentes.md`](docs/agentes.md).
 
 ## Comandos
 
