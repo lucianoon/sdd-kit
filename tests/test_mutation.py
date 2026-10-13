@@ -234,6 +234,53 @@ def test_ac_088_arvores_de_outros_sistemas_nao_sao_tocadas(tmp_path, monkeypatch
     assert (tmp_path / "sdd-mutate-alien").exists() is False
 
 
+def test_ac_088_rmtree_do_sweep_ignora_erros(tmp_path, monkeypatch):
+    import shutil as sh
+    import tempfile as tf
+
+    from sdd import mutation
+
+    vistos = []
+
+    def espião(path, ignore_errors=False, **kw):
+        vistos.append(ignore_errors)
+        if not ignore_errors:
+            raise PermissionError(path)  # mutant True→False morre aqui
+
+    monkeypatch.setattr(sh, "rmtree", espião)
+    monkeypatch.setattr(tf, "gettempdir", lambda: str(tmp_path))
+    (tmp_path / "sdd-mutate-velha").mkdir()
+    assert mutation.sweep_stale(max_age=0) == 1
+    assert vistos == [True]  # sem ignore_errors, um diretório travado derrubaria o mutate
+
+
+def test_ac_088_copias_mal_nascidas_nao_deixam_lixo(tmp_path, monkeypatch):
+    import shutil as sh
+
+    from sdd.mutation import _copy_project
+
+    # copytree que falha a meio (legítimo: disco cheio) NÃO pode deixar a pasta para trás
+    monkeypatch.setattr(sh, "copytree",
+                        lambda src, dst, **kw: (_ for _ in ()).throw(OSError("disco cheio")))
+    vistos = []
+    real_rmtree = sh.rmtree
+
+    def espião(path, ignore_errors=False, **kw):
+        vistos.append(ignore_errors)
+        return real_rmtree(path, ignore_errors=ignore_errors)
+
+    monkeypatch.setattr(sh, "rmtree", espião)
+    try:
+        _copy_project(tmp_path, [])
+    except OSError:
+        pass
+    else:
+        raise AssertionError("falha de copytree deveria propagar")
+    left = list(tmp_path.glob("sdd-mutate-*"))
+    assert left == [], left
+    assert vistos == [True]  # a limpeza da pasta mal nascida roda e tolera erros
+
+
 def test_copia_isolada_ignora_git_e_referencia_dependencias(tmp_path):
     from sdd.mutation import _copy_project
     root = tmp_path / "proj"

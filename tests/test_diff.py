@@ -160,6 +160,22 @@ def test_ac_088_filho_do_git_indisponivel_conserva_mudanca(tmp_path, monkeypatch
     assert _meaningful_spec_change(tmp_path, "specs/features/FEATURE-001/spec.yaml", "mb") is True
 
 
+def test_ac_087_spec_removida_do_disco_e_mudanca_real(repo):
+    # unidade: spec sem arquivo no disco é tratada como mudança real, não cosmética
+    from sdd.diff import _meaningful_spec_change
+
+    assert _meaningful_spec_change(repo, "specs/features/INEXISTENTE/spec.yaml", "mb") is True
+    # a spec não existe mais no disco: não é reformatar, é abrir mão do contrato
+    write(repo, "specs/features/FEATURE-002/spec.yaml",
+          SPEC.replace("pedidos", "pagamentos"))
+    write(repo, "src/pedidos/api.py", "x = 2\n")
+    (repo / "specs/features/FEATURE-001/spec.yaml").unlink()
+    commit(repo)
+    r = run_diff(repo)
+    assert r.exit_code == 1, r.output
+    assert "src/pedidos/api.py: código sem feature dona" in r.output
+
+
 @pytest.mark.parametrize("path,pattern,ok", [
     ("src/a/b/c.py", "src/**", True),
     ("src/c.py", "src/*.py", True),
