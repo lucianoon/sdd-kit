@@ -152,6 +152,14 @@ def test_ac_088_mudanca_comentarios_alienigenas(repo):
     assert semantic_hash(broken + "\n") == semantic_hash(broken)
 
 
+def test_ac_088_filho_do_git_indisponivel_conserva_mudanca(tmp_path, monkeypatch):
+    from sdd.diff import GitError, _meaningful_spec_change
+    import sdd.diff as d
+
+    monkeypatch.setattr(d, "_git_show", lambda root, ref, path: (_ for _ in ()).throw(GitError("boom")))
+    assert _meaningful_spec_change(tmp_path, "specs/features/FEATURE-001/spec.yaml", "mb") is True
+
+
 @pytest.mark.parametrize("path,pattern,ok", [
     ("src/a/b/c.py", "src/**", True),
     ("src/c.py", "src/*.py", True),

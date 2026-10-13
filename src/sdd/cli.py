@@ -25,7 +25,7 @@ def _verdict(ok: bool, tail: str) -> None:
     """Linha final de um comando. Cores só em terminal; no CI a saída sai limpa."""
     typer.echo("")
     typer.secho("APROVADO" if ok else "REPROVADO", fg=typer.colors.GREEN if ok else typer.colors.RED,
-                bold=True, nl=False)
+                bold=True, nl=False)  # sdd: no-mutate (cores: mudança só de apresentação)
     typer.echo(f" — {tail}" if tail else "")
 
 

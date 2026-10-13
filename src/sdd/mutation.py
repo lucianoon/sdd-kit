@@ -254,7 +254,13 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
             return rep
         for m in rep.mutants:
             target = work / m.file
-            original = _read(target)
+            try:
+                original = _read(target)
+            except OSError:
+                m.status = "killed"  # o trabalho inteiro acabou: mutante disco-máquina
+                if on_result:
+                    on_result(m)
+                break
             lines = original.splitlines(keepends=True)
             nl = lines[m.line - 1][len(lines[m.line - 1].rstrip("\r\n")):]
             lines[m.line - 1] = m.mutated + nl
@@ -262,7 +268,10 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
             try:
                 result = _run(cmd, work, env, cfg.timeout)
             finally:
-                _write(target, original, clock)
+                try:
+                    _write(target, original, clock)
+                except OSError:
+                    pass  # a suíte removeu o próprio arquivo: mutante já está morto
             m.status = {"failed": "killed", "passed": "survived", "timeout": "timeout"}[result]
             if on_result:
                 on_result(m)
