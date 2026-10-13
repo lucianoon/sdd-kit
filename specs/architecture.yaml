@@ -19,3 +19,7 @@ rules:
     from: [src/sdd/models.py]
     forbid: [subprocess, shutil, typer]
     forbid_paths: [src/sdd/core, src/sdd/diff, src/sdd/arch, src/sdd/evals, src/sdd/mutation]
+  - id: ARCH-003
+    description: Nenhuma aprovação depende de LLM (AD-001); o kit não importa SDK de modelo
+    from: ["src/sdd/**"]
+    forbid: [openai, anthropic, "langchain*", "langgraph*", litellm, google.generativeai, "google.genai", cohere, mistralai, ollama]

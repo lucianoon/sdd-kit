@@ -18,6 +18,9 @@ code: []
 # Rigor proporcional ao tamanho: `design` só é exigido para estes sizes.
 require_design: true
 design_required_for: [large, complex]
+require_tasks: true
+tasks_required_for: [large, complex]
+strict_criteria: false   # true: critério vago ("rápido", "seguro") vira erro em vez de aviso
 # Feature `small` que altera mais arquivos de código que isto reprova o `sdd diff`.
 small_max_files: 3
 
@@ -67,29 +70,40 @@ rules: []
   #   from: ["src/api/**"]
   #   forbid_paths: ["src/adapters/llm/**"]
 """,
-    "specs/constitution.md": """\
-# Constituição do projeto
-
-Regras que valem para qualquer agente e qualquer pessoa.
-
-1. As specs em `specs/` são a fonte da verdade. Código que diverge delas está errado.
-2. Mudou o comportamento? Mude a spec no mesmo commit.
-   Refatoração sem mudança de comportamento declara no commit:
-   `SDD-No-Spec-Change: <motivo>`.
-3. Todo `AC-NNN` e `NFR-NNN` tem ao menos um teste cujo nome contém o ID.
-4. "Pronto" significa `sdd check` verde, não uma resposta convincente.
-   Quem escreveu o código não é quem decide se está correto.
-5. O rigor acompanha o tamanho (`size`). Features `large`/`complex` têm `design`:
-   números com fonte, fluxo de dados, ao menos duas alternativas e riscos tratados.
-6. Números de volume, latência e erro vêm de pessoas ou de medição. Agente não inventa.
-7. Spec com pergunta aberta não está pronta para implementar.
-   Dependências entre camadas seguem `specs/architecture.yaml`; toda dependência externa
-   declara timeout, retry, fallback e idempotência.
-   Comportamento de LLM é verificado por `evals` estatísticos, nunca por um teste isolado;
-   o dataset de um eval só muda junto com a spec.
-8. Exigem aprovação humana explícita: push, deploy, migrações destrutivas, banco de
-   produção, mudança de contrato público, segredos/permissões, remoção ou
-   enfraquecimento de testes.
+    "specs/constitution.yaml": """\
+# Constituição: regras do projeto inteiro. Cada princípio diz o que o cobra (enforced_by) ou,
+# se nada automático cobra, como é revisado (manual). O `sdd check` mostra o estado de cada um.
+# enforced_by aceita: ARCH-NNN, AC/NFR/EVAL, gate:<nome em sdd.yaml>, kit:<recurso>,
+# profile:<requisito do perfil de agentes>.
+principles:
+  - id: CONST-01
+    rule: As specs são a fonte da verdade; código que diverge delas está errado.
+    enforced_by: [kit:diff]
+  - id: CONST-02
+    rule: Todo AC e NFR tem teste passando cujo nome contém o ID; "pronto" é o check verde.
+    enforced_by: [kit:check]
+  - id: CONST-03
+    rule: Testes detectam código errado; nunca são enfraquecidos para passar.
+    enforced_by: [kit:mutate]
+  - id: CONST-04
+    rule: O rigor acompanha o size; large e complex têm design e tarefas.
+    enforced_by: [kit:design, kit:tasks]
+  - id: CONST-05
+    rule: Spec com pergunta aberta ou campo PREENCHER não está pronta para implementar.
+    enforced_by: [kit:validate]
+  - id: CONST-06
+    rule: Números de volume, latência e erro vêm de pessoas ou medição, nunca do agente.
+    manual: revisão do campo `source` de cada número no PR
+  - id: CONST-07
+    rule: Toda dependência externa declara timeout, retry, fallback e idempotência.
+    enforced_by: [kit:dependencies]
+  - id: CONST-08
+    rule: Comportamento de LLM é verificado por evals estatísticos, nunca por um teste isolado.
+    enforced_by: [kit:eval]
+  - id: CONST-09
+    rule: Push, deploy, migração destrutiva, banco de produção e mudança de contrato público
+      exigem aprovação humana explícita.
+    manual: branch protegida com revisão obrigatória; aprovação registrada no PR
 """,
     "specs/features/FEATURE-001/spec.yaml": """\
 feature: exemplo
@@ -195,6 +209,19 @@ evals: []
   #   use_lower_bound: true                 # compara o limite inferior do IC 95%
   #   judge: deterministic                  # ou llm (exige allow_llm_judge)
 
+# Tarefas pequenas e verificáveis (exigidas em large/complex). Todo critério precisa de uma.
+tasks:
+  - id: T-01
+    title: Implementar o comportamento do AC-001
+    origin: [AC-001]
+    done_when: test_ac_001 passa no sdd check
+  - id: T-02
+    title: Atender o limite de latência
+    origin: [NFR-001]
+    depends_on: [T-01]
+    done_when: benchmark test_nfr_001 passa
+    # ao concluir: status: done e evidence: [NFR-001]
+
 invariants: []
 quality_gates: []
 # Código que pertence a esta feature. Mudou aqui sem mudar a spec? `sdd diff` reprova.
@@ -208,93 +235,113 @@ paths: []
 
 Este repositório segue SDD (Specification-Driven Development). Você decide **como**
 implementar; a spec decide **o que** é correto; o `sdd` decide se está pronto.
+A intenção é registrada e revisada antes da implementação, e tudo fica no repositório:
+nenhuma decisão vive só na conversa.
 
-Leia `specs/constitution.md`, `specs/decisions.yaml` e a spec da feature antes de agir.
+Ciclo por feature: 0 constituição → 1 especificação → 2 clarificação → 3 plano →
+4 tarefas → 5 análise → 6 implementação. Ciclos curtos; descoberta na implementação volta
+para a spec.
 
-## 0. Dimensione
+## 0. Constituição (`specs/constitution.yaml`)
 
-Classifique a mudança e registre em `size`. O rigor acompanha o tamanho:
+Regras do projeto inteiro, com ID e o que as cobra (`enforced_by`) ou como são revisadas
+(`manual`). Não é recriada a cada feature.
+- **Faça:** proponha princípios curtos e verificáveis; separe o decidido do pendente.
+- **Não faça:** não transforme preferência vaga em regra; não invente requisito de negócio;
+  não implemente código nesta etapa.
+- **Pronto quando:** `sdd validate` aceita a constituição e cada princípio tem cobrança.
+
+## 1. Especificação
+
+Comece com `sdd specify <nome> --size <size>` (IDs livres e seções exigidas).
 
 | size | Quando | Exigido |
 |---|---|---|
 | small | ≤3 arquivos, cabe numa frase | spec curta + testes |
 | medium | feature clara, poucos passos | spec + testes |
-| large | vários componentes | + `design` + tarefas explícitas |
-| complex | ambiguidade, domínio novo | + `design` + pesquisa + perguntas ao humano |
+| large | vários componentes | + `design` + `tasks` |
+| complex | ambiguidade, domínio novo | + `design` + `tasks` + perguntas ao humano |
 
-Na dúvida, escolha o maior. O `sdd diff` reprova `small` que altera mais de 3 arquivos.
+- **Faça:** problema, objetivo, fora de escopo, requisitos (`REQ`) e critérios (`AC`) com
+  resultado observável (dado / quando / então) e efeitos proibidos (`forbidden`) quando houver.
+- **Não faça:** não escolha stack na spec (isso é plano); não use "rápido", "seguro",
+  "corretamente" sem número: o `validate` avisa; não preencha lacunas em silêncio.
+- **Pronto quando:** dá para derivar testes sem inventar regras; nenhum `PREENCHER:` resta.
 
-## 1. Especifique
+## 2. Clarificação
 
-- Comece com `sdd specify <nome> --size <size>`: gera o esqueleto com IDs livres e as
-  seções exigidas. Troque cada `PREENCHER` por conteúdo real; o `sdd validate` aponta o que falta.
-- Requisitos com IDs (`REQ-NNN`) e critérios testáveis (`AC-NNN`): dado / quando / então.
-- Liste o que está **fora de escopo**.
-- Toda lacuna vira `assumptions` (padrão escolhido + justificativa) ou `open_questions`.
-- Dimensões que costumam esconder requisitos implícitos: persistência, chamadas externas,
-  autenticação, pagamentos, concorrência, transições de estado. Se a feature toca alguma,
-  pergunte ao humano antes de seguir.
-- Pergunta aberta sem `answer` bloqueia o `sdd validate`. Não responda por conta própria.
+- **Faça:** procure termos vagos, contradições, exceções ausentes, limites, permissões e
+  concorrência indefinidos. Cada ponto vira `open_questions` (com o requisito afetado) ou
+  `assumptions` (padrão escolhido + justificativa). Incorpore as respostas na própria spec.
+- **Não faça:** não responda `open_questions` por conta própria; não avance com pergunta
+  aberta (o `validate` bloqueia).
+- **Pronto quando:** nenhuma ambiguidade bloqueadora; suposições registradas com motivo.
 
-## 2. Desenhe (large/complex)
+## 3. Plano (`design`, large/complex)
 
-1. **Números primeiro.** Pergunte: frequência de chegada, tamanho do payload, atraso
-   aceitável, taxa de erro aceitável. Não invente; todo número tem `source`.
-2. **Fluxo de dados.** Como chegam (HTTP, stream, arquivo) e onde são consumidos.
-3. **Alternativas.** Ao menos duas, entregando o mesmo escopo. Lidere com a recomendação.
-4. **Riscos.** Cada um mitigado por um AC/NFR testável ou aceito com motivo escrito.
-5. **Modos de falha.** Para cada dependência externa (LLM, banco, fila, API, tool):
-   timeout, retry, fallback, se tem efeito colateral e se é idempotente. Retry em operação
-   com efeito colateral exige idempotência (ex.: chave de idempotência); o validador cobra.
-   Cada dependência aponta para os testes que simulam a falha (`covered_by`).
-6. Respeite as decisões ativas em `specs/decisions.yaml`. Conflito? Proponha uma nova
-   decisão que substitua a antiga; não a ignore em silêncio.
-7. Apresente o `design` para aprovação humana antes de escrever código.
+1. **Números primeiro**, todos com `source`: frequência, payload, atraso e erro aceitáveis.
+2. **Fluxo de dados**: como chegam e onde são consumidos.
+3. **Alternativas**: ao menos duas para o mesmo escopo; lidere com a recomendação.
+4. **Riscos**: mitigados por AC/NFR/EVAL/ARCH ou aceitos com motivo.
+5. **Dependências e modos de falha**: timeout, retry, fallback, efeito colateral,
+   idempotência, consulta de status; escrita sem idempotência nem consulta exige
+   `reconciliation`.
+6. Respeite `specs/decisions.yaml` e `specs/architecture.yaml`; conflito vira nova decisão.
+- **Não faça:** não gere código de implementação; não escolha framework por gosto.
+- **Pronto quando:** cada requisito relevante tem solução identificável e o humano aprovou.
 
-## 3. Quebre em tarefas (large/complex)
+## 4. Tarefas (`tasks`, large/complex)
 
-Tarefas pequenas, com dependências explícitas, cada uma citando os IDs que entrega
-e com seus testes junto. Mais de ~5 passos numa feature medium? Ela era large.
+Cada tarefa: `id` (T-01), `origin` (REQ/AC/NFR/EVAL, ARCH ou CONST), `depends_on`,
+`done_when` e, ao concluir, `evidence` e `status: done`.
+- **Faça:** separe persistência, concorrência, contrato, integração e avaliação quando
+  tiverem evidências distintas.
+- **Não faça:** nada de "implementar o agente completo"; não crie tarefa sem origem nem
+  capacidade fora da spec; não presuma execução paralela.
+- **Pronto quando:** todo critério tem tarefa, as dependências não têm ciclo (`validate`).
 
-## 4. Implemente
-
-- Uma tarefa por vez. Os testes vêm dos critérios da spec, não do código que você escreveu:
-  assertam o resultado definido na spec.
-- Nome do teste contém o ID: `test_ac_001_pedido_persistido`, `test_nfr_001_p95_abaixo_de_200ms`.
-- Um commit por tarefa, citando os IDs. Nunca enfraqueça, pule ou apague testes para passar.
-- Mudou código em `paths` de uma feature? Atualize a spec dela no mesmo PR.
-- `SDD-No-Spec-Change: <motivo>` só para refatoração sem mudança de comportamento.
-
-## 5. Verifique (não é você quem aprova)
+## 5. Análise
 
 ```
-sdd validate && sdd check && sdd mutate
+sdd validate
 ```
+Cruza constituição, spec, plano e tarefas: requisito órfão, tarefa sem origem, referência
+quebrada, ciclo, critério vago, pergunta aberta, módulo pendente do perfil.
+- **Não faça:** não declare consistência sem rodar o comando; não altere código nesta etapa.
 
-- `sdd check`: todo AC/NFR tem teste passando.
-- `sdd mutate`: os testes pegam código errado. Mutante sobrevivente = asserção fraca;
-  fortaleça o teste, não mexa no código para "matar" o mutante.
-- Cole a saída. "Pronto" é o comando verde, não a sua avaliação.
+## 6. Implementação e verificação
+
+1. Pegue uma tarefa com dependências concluídas e leia constituição, spec e plano.
+2. Implemente só o escopo dela. Testes vêm dos critérios da spec, não do código que você
+   escreveu; o nome contém o ID (`test_ac_001_...`).
+3. Rode `sdd validate && sdd check && sdd mutate` e cole a saída.
+4. Marque a tarefa `done` com `evidence`; um commit por tarefa, citando os IDs.
+- **Não faça:** não enfraqueça, pule ou apague testes; não "mate" mutante mexendo no código
+  em vez de fortalecer o teste; não declare pronto sem o comando verde.
+- Conflito ou decisão ausente: registre o bloqueio na spec antes de assumir comportamento.
+
+### Tratamento de mudanças
+
+| Situação | O que fazer | O `sdd diff` cobra |
+|---|---|---|
+| Mudou o comportamento desejado | atualize a spec primeiro; depois plano, tarefas e testes | spec alterada junto com o código |
+| Código descumpre uma spec correta (bug) | corrija e acrescente teste de regressão com o ID | trailer `SDD-Fix: AC-NNN` + teste alterado citando o ID |
+| Mudou só a solução técnica | preserve o comportamento aprovado | trailer `SDD-No-Spec-Change: <motivo>` |
 
 ## Sistemas com LLM (evals)
 
-- Comportamento do modelo (escolha de tool, qualidade, alucinação) não se prova com um teste
-  que passa uma vez. Use `evals` na spec: dataset versionado, várias execuções, limite.
-- Prompts e config do modelo ficam nos `paths` da feature: trocá-los exige atualizar a spec.
-- **Nunca** ajuste prompt para casos específicos do dataset, nem edite o dataset para passar.
-  Mudar o dataset é mudar a régua: exige mudança na spec e aprovação humana (`sdd diff` cobra).
-- O harness grava resultados brutos por caso; não calcule nem declare a nota final.
-- Rode `sdd eval` (custa chamadas de API; avise antes de rodar datasets grandes).
+- Comportamento do modelo não se prova com um teste que passa uma vez: use `evals`
+  (dataset versionado, várias execuções, limite; `critical: true` para o que não pode falhar).
+- Prompts e config do modelo ficam nos `paths` da feature.
+- **Nunca** ajuste prompt para casos do dataset nem edite o dataset para passar.
+- O harness grava resultados brutos; não calcule nem declare a nota. `sdd eval` custa API.
 
 ## Regras gerais
 
-- Não invente APIs, comportamentos ou números. Procure no código, na documentação do projeto
-  e na documentação oficial; se não achar, diga que não sabe.
-- Push, deploy, migração destrutiva e banco de produção exigem aprovação explícita
-  para aquela ação; aprovar a spec não autoriza nada disso.
-- Respeite `specs/architecture.yaml`: domínio não importa framework, provedor de LLM nem
-  infraestrutura; dependa de interfaces (ports) e implemente adapters. `sdd arch` verifica.
-  Nunca adicione `sdd: allow` sem pedir aprovação; a exceção fica registrada no relatório.
+- Não invente APIs, comportamentos ou números; se não achar, diga que não sabe.
+- Push, deploy, migração destrutiva e banco de produção exigem aprovação explícita.
+- Domínio não importa framework, provedor de LLM nem infraestrutura (`sdd arch`). Nunca
+  adicione `sdd: allow` sem aprovação.
 """,
     ".github/workflows/sdd.yml": """\
 name: sdd

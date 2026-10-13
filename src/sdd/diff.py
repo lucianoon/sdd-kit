@@ -11,6 +11,10 @@ from .core import Project
 
 GIT_TIMEOUT = 60  # segundos
 TRAILER = re.compile(r"^SDD-No-Spec-Change:[ \t]*(.+)$", re.MULTILINE)
+# Correção de bug: o código descumpria uma spec correta. Não exige mudar a spec, exige um
+# teste de regressão alterado no mesmo PR que cite o critério corrigido.
+FIX_TRAILER = re.compile(r"^SDD-Fix:[ \t]*(.+)$", re.MULTILINE)
+CRITERION = re.compile(r"\b(?:AC|NFR)-\d{3,}\b")
 
 
 class GitError(RuntimeError):
@@ -73,12 +77,36 @@ class DiffResult:
         return not self.violations
 
 
+def _regression_tests(proj: Project, changed: list[str], ids: set[str]) -> dict[str, list[str]]:
+    """Para cada ID, os arquivos de teste alterados no PR que o citam."""
+    from .core import ID_IN_TEST
+
+    test_globs = proj.config.tests.paths if proj.config else []
+    found: dict[str, list[str]] = {i: [] for i in ids}
+    for f in changed:
+        if not matches(f, test_globs):
+            continue
+        try:
+            text = (proj.root / f).read_text(encoding="utf-8")
+        except (FileNotFoundError, UnicodeDecodeError, IsADirectoryError):
+            continue
+        cited = {f"{(m['a'] or m['b']).upper()}-{m['n']}" for m in ID_IN_TEST.finditer(text)}
+        for i in ids & cited:
+            found[i].append(f)
+    return found
+
+
 def evaluate(proj: Project, changed: list[str], messages: str) -> DiffResult:
     res = DiffResult(changed=changed)
     m = TRAILER.search(messages)
     res.override = m.group(1).strip() if m else None
     code_globs = proj.config.code if proj.config else []
     found: list[str] = []
+    fix_ids = {i for line in FIX_TRAILER.findall(messages) for i in CRITERION.findall(line)}
+    known = {c[0] for s in proj.specs.values() for c in s.criteria()}
+    for i in sorted(fix_ids - known):
+        res.violations.append(f"SDD-Fix cita {i}, que não existe em nenhuma spec")
+    regression = _regression_tests(proj, changed, fix_ids & known)
 
     owned: set[str] = set()
     for rel, spec in proj.specs.items():
@@ -92,7 +120,17 @@ def evaluate(proj: Project, changed: list[str], messages: str) -> DiffResult:
             res.violations.append(
                 f"{spec.feature}: marcada como small mas alterou {len(code)} arquivos de código "
                 f"(limite {limit}); reclassifique o size ou divida a mudança")
-        if code and not spec_changed:
+        mine = {c[0] for c in spec.criteria()} & fix_ids
+        if code and not spec_changed and mine:
+            missing = sorted(i for i in mine if not regression[i])
+            if missing:
+                res.violations.append(
+                    f"{spec.feature}: SDD-Fix cita {', '.join(missing)} sem teste de regressão alterado "
+                    "que cite o ID (correção sem teste não comprova nada)")
+            for i in sorted(mine - set(missing)):
+                res.warnings.append(f"{spec.feature}: correção de {i} sem mudar a spec, com teste de "
+                                    f"regressão em {', '.join(regression[i])}")
+        elif code and not spec_changed:
             found.append(
                 f"{spec.feature}: código alterado sem mudança em {spec_dir} "
                 f"({', '.join(code[:3])}{' …' if len(code) > 3 else ''})"

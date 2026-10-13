@@ -10,7 +10,8 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from .models import AgentsProfile, ArchRule, Architecture, Config, Decision, DecisionLog, Spec
+from .models import (AgentsProfile, ArchRule, Architecture, Config, Constitution, Decision,
+                     DecisionLog, Spec)
 
 CONFIG_PATH = "specs/sdd.yaml"
 DECISIONS_PATH = "specs/decisions.yaml"
@@ -36,6 +37,7 @@ class Project:
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     agents: "AgentsProfile | None" = None
+    constitution: "Constitution | None" = None
 
 
 def _load_yaml(path: Path):
@@ -158,7 +160,45 @@ def load(root: Path) -> Project:
                 proj.errors.append(
                     f"{rel}: {ev.id}: dataset tem {len(ids)} casos, menos que min_cases {ev.min_cases}")
     _load_agents(proj)
+    _load_constitution(proj)
+    _analyze(proj)
     return proj
+
+
+def _load_constitution(proj: Project) -> None:
+    from .analysis import CONSTITUTION_PATH, check_constitution
+
+    f = proj.root / CONSTITUTION_PATH
+    if not f.exists():
+        return
+    try:
+        proj.constitution = Constitution.model_validate(yaml.safe_load(f.read_text(encoding="utf-8")) or {})
+    except ValidationError as exc:
+        proj.errors += _fmt(CONSTITUTION_PATH, exc)
+        return
+    except yaml.YAMLError as exc:
+        proj.errors.append(f"{CONSTITUTION_PATH}: YAML inválido: {exc}")
+        return
+    proj.errors += check_constitution(proj, proj.constitution)
+
+
+def _analyze(proj: Project) -> None:
+    """Tarefas (origem, dependências, cobertura) e critérios vagos."""
+    from .analysis import check_criteria, check_tasks
+
+    global_ids = {r.id for r in proj.arch}
+    if proj.constitution:
+        global_ids |= {p.id for p in proj.constitution.principles}
+    for rel, spec in proj.specs.items():
+        cfg = proj.config
+        if cfg and cfg.require_tasks and spec.size in cfg.tasks_required_for and not spec.tasks:
+            proj.errors.append(f"{rel}: `tasks` obrigatório para size '{spec.size}' (require_tasks: true)")
+        proj.errors += check_tasks(rel, spec, global_ids)
+        vague = check_criteria(rel, spec)
+        if cfg and cfg.strict_criteria:
+            proj.errors += vague
+        else:
+            proj.warnings += vague
 
 
 def _placeholders(rel: str, text: str) -> list[str]:
@@ -305,18 +345,39 @@ def check(proj: Project) -> dict:
         problems.append(f"suíte de testes saiu com código {test_rc}")
 
     gates = []
-    needed = sorted({g for s in proj.specs.values() for g in s.quality_gates})
+    needed = {g for s in proj.specs.values() for g in s.quality_gates}
+    if proj.constitution:  # gates que cobram princípios da constituição também rodam
+        needed |= {r[5:] for p in proj.constitution.principles for r in p.enforced_by
+                   if r.startswith("gate:")}
+    needed = sorted(needed)
     for g in needed:
         rc, out = run(cfg.gates[g], proj.root, cfg.tests.timeout)
         gates.append({"gate": g, "command": cfg.gates[g], "ok": rc == 0, "output": out if rc else ""})
         if rc != 0:
             problems.append(f"gate '{g}' falhou (código {rc})")
 
+    verdicts = {r["id"]: r["verdict"] for r in rows}
+    violated = {v["rule"] for v in arch_report.get("violations", [])}
+    verdicts.update({rid: ("VIOLADA" if rid in violated else "OK") for rid in arch_report.get("rules", [])})
+    task_rows = []
+    for spec in proj.specs.values():
+        for task in spec.tasks:
+            ev = [{"id": r, "verdict": verdicts.get(r, "ver sdd eval" if r.startswith("EVAL-") else "?")}
+                  for r in task.evidence]
+            bad = [e["id"] for e in ev if e["verdict"] not in ("OK", "ver sdd eval")]
+            if task.status == "done" and bad:
+                problems.append(f"{task.id} ({spec.feature}) marcada como done, mas a evidência não passa: "
+                                + ", ".join(f"{e['id']} {e['verdict']}" for e in ev if e["id"] in bad))
+            task_rows.append({"feature": spec.feature, "id": task.id, "title": task.title,
+                              "status": task.status, "origin": task.origin, "evidence": ev})
+
     return {
         "ok": not problems, "problems": problems, "criteria": rows, "gates": gates,
         "risks": risk_matrix(proj), "architecture": arch_report,
         "dependencies": dependency_matrix(proj),
         "profile": _profile_matrix(proj, rows, arch_report),
+        "tasks": task_rows,
+        "constitution": _constitution_matrix(proj, rows, arch_report, gates),
         "tests": {"command": cfg.tests.command, "exit_code": test_rc,
                   "output": test_out if test_rc else ""},
     }
@@ -343,6 +404,19 @@ def _profile_matrix(proj: Project, rows: list[dict], arch_report: dict) -> dict 
     violated = {v["rule"] for v in arch_report.get("violations", [])}
     verdicts.update({rid: ("VIOLADA" if rid in violated else "OK") for rid in arch_report.get("rules", [])})
     return {"stage": proj.agents.stage, "requirements": matrix(proj, proj.agents, verdicts)}
+
+
+def _constitution_matrix(proj: Project, rows: list[dict], arch_report: dict, gates: list[dict]):
+    if proj.constitution is None:
+        return None
+    from .analysis import constitution_matrix
+
+    verdicts = {r["id"]: r["verdict"] for r in rows}
+    violated = {v["rule"] for v in arch_report.get("violations", [])}
+    verdicts.update({rid: ("VIOLADA" if rid in violated else "OK") for rid in arch_report.get("rules", [])})
+    prof = _profile_matrix(proj, rows, arch_report) or {"requirements": []}
+    states = {r["id"]: r["state"] for r in prof["requirements"]}
+    return constitution_matrix(proj.constitution, verdicts, {g["gate"]: g["ok"] for g in gates}, states)
 
 
 def dependency_matrix(proj: Project) -> list[dict]:
@@ -402,6 +476,18 @@ def render_markdown(report: dict) -> str:
             out.append(f"| {d['feature']} | {d['name']} ({d['kind']}) | {d['timeout_ms']} ms | "
                        f"{d['retry']['max_attempts']} | {'sim' if d['side_effects'] else 'não'} | "
                        f"{'sim' if d['idempotent'] else 'não'} | {d['fallback']} | {tested} |")
+    const = report.get("constitution")
+    if const:
+        out += ["", "## Constituição", "", "| Princípio | Estado | Cobrado por |", "|---|---|---|"]
+        for c in const:
+            how = ", ".join(f"{r['ref']} ({r['state']})" for r in c["enforced_by"]) or f"revisão manual: {c['manual']}"
+            out.append(f"| {c['id']} {c['rule']} | {c['status']} | {how} |")
+    if report.get("tasks"):
+        out += ["", "## Tarefas", "", "| Feature | Tarefa | Status | Origem | Evidência |", "|---|---|---|---|---|"]
+        for tk in report["tasks"]:
+            ev = ", ".join(f"{e['id']} ({e['verdict']})" for e in tk["evidence"]) or "—"
+            out.append(f"| {tk['feature']} | {tk['id']} {tk['title']} | {tk['status']} | "
+                       f"{', '.join(tk['origin'])} | {ev} |")
     prof = report.get("profile")
     if prof:
         active = [r for r in prof["requirements"] if r["state"] not in ("INATIVO", "PENDENTE", "NÃO DECLARADO")]

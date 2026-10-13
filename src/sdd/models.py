@@ -338,6 +338,51 @@ class DecisionLog(Strict):
 
 # --- Spec e config ------------------------------------------------------------
 
+# --- Tarefas e constituição -------------------------------------------------------
+
+TASK_PATTERN = r"^T-\d{2,}$"
+CONST_PATTERN = r"^CONST-\d{2,}$"
+
+
+class Task(Strict):
+    """Unidade pequena e verificável de trabalho, com origem e evidência explícitas."""
+    id: str = Field(pattern=TASK_PATTERN)  # única dentro da spec
+    title: str = Field(min_length=1)
+    origin: list[str] = Field(min_length=1)  # REQ/AC/NFR/EVAL desta spec, ARCH ou CONST
+    depends_on: list[str] = []
+    done_when: str = Field(min_length=1)  # critério de conclusão observável
+    evidence: list[str] = []  # AC/NFR/EVAL/ARCH que provam a conclusão
+    status: Literal["todo", "doing", "done"] = "todo"
+
+    @model_validator(mode="after")
+    def _concluida_tem_evidencia(self):
+        if self.status == "done" and not self.evidence:
+            raise ValueError("tarefa done precisa de `evidence` (AC/NFR/EVAL/ARCH que provam a conclusão)")
+        return self
+
+
+ENFORCERS_KIT = ("validate", "check", "design", "limits", "dependencies", "tasks", "diff", "mutate",
+                 "eval", "arch", "profile")
+
+
+class Principle(Strict):
+    id: str = Field(pattern=CONST_PATTERN)
+    rule: str = Field(min_length=1)
+    # O que cobra a regra: ARCH-NNN, AC/NFR/EVAL, gate:<nome>, kit:<recurso>, profile:<requisito>.
+    enforced_by: list[str] = []
+    manual: str = ""  # quando nada automático cobra: o procedimento de revisão
+
+    @model_validator(mode="after")
+    def _cobranca(self):
+        if not self.enforced_by and not self.manual.strip():
+            raise ValueError("princípio precisa de `enforced_by` ou de `manual` (como é revisado)")
+        return self
+
+
+class Constitution(Strict):
+    principles: list[Principle] = Field(min_length=1)
+
+
 class Spec(Strict):
     feature: str = Field(pattern=r"^[a-z0-9][a-z0-9-]*$")
     version: int = Field(ge=1)
@@ -351,6 +396,7 @@ class Spec(Strict):
     requirements: list[Requirement] = Field(min_length=1)
     design: Design | None = None
     evals: list[Eval] = []
+    tasks: list[Task] = []
     invariants: list[str] = []
     quality_gates: list[str] = []
     # Código que pertence a esta feature (globs com **). Usado por `sdd diff`.
@@ -369,6 +415,9 @@ class TestsConfig(Strict):
     command: str
     junit: str
     timeout: int = Field(3600, ge=1)  # segundos; vale para testes e gates
+    # Onde ficam os testes (para o `sdd diff` reconhecer um teste de regressão em SDD-Fix).
+    paths: list[str] = ["tests/**", "test/**", "**/test_*.py", "**/*_test.py", "**/*_test.go",
+                        "**/*.test.*", "**/*.spec.*", "**/src/test/**"]
 
 
 class Config(Strict):
@@ -380,6 +429,11 @@ class Config(Strict):
     # Exige a seção `design` nas specs cujo `size` está em `design_required_for`.
     require_design: bool = False
     design_required_for: list[Size] = ["large", "complex"]
+    # Exige `tasks` nas specs com size em tasks_required_for.
+    require_tasks: bool = False
+    tasks_required_for: list[Size] = ["large", "complex"]
+    # Critério vago ("rápido", "seguro", "corretamente") sem valor observável: aviso, ou erro se true.
+    strict_criteria: bool = False
     # Feature `small` que altera mais arquivos de código que isto reprova o `sdd diff`.
     small_max_files: int = Field(3, ge=1)
     mutation: MutationConfig = Field(default_factory=lambda: MutationConfig())

@@ -121,6 +121,7 @@ def test_ac_066_critico_exige_evidencia_deterministica(tmp_path):
     s = yaml.safe_load(spec.read_text(encoding="utf-8"))
     s["evals"] = [{"id": "EVAL-001", "metric": "m", "dataset": "evals/d.jsonl", "min_cases": 1,
                    "threshold": {"min": 0.9}}]
+    s["tasks"][0]["origin"].append("EVAL-001")  # todo eval precisa de tarefa (requisito órfão)
     spec.write_text(encoding="utf-8", data=yaml.safe_dump(s, allow_unicode=True))
     write_agents(tmp_path, coverage={"N-04": ["EVAL-001"]})
     assert "N-04 (Confiança) é crítico: exige ao menos uma evidência determinística" in errors(tmp_path)

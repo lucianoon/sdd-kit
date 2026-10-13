@@ -41,6 +41,21 @@ def _existing(root: Path) -> tuple[dict[str, int], set[str], int]:
     return top, features, last_dir
 
 
+def _config(root: Path) -> dict:
+    cfg_file = root / CONFIG_PATH
+    if not cfg_file.exists():
+        return {}
+    try:
+        return yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return {}
+
+
+def _tasks_required(root: Path, size: str) -> bool:
+    cfg = _config(root)
+    return bool(cfg.get("require_tasks")) and size in cfg.get("tasks_required_for", ["large", "complex"])
+
+
 def _design_required(root: Path, size: str) -> bool:
     cfg_file = root / CONFIG_PATH
     cfg = {}
@@ -53,7 +68,7 @@ def _design_required(root: Path, size: str) -> bool:
 
 
 def render(name: str, size: str, acs: int, ids: dict[str, int], with_design: bool,
-           with_limits: bool = False) -> str:
+           with_limits: bool = False, with_tasks: bool = False) -> str:
     def nid(kind: str, offset: int = 1) -> str:
         return f"{kind}-{ids[kind] + offset:03d}"
 
@@ -117,6 +132,15 @@ design:
     max_tool_calls: 0             # {P}: chamadas de ferramenta por execução
     cost_ceiling: {{value: 0, unit: "{P}: BRL, USD, tokens", window: "{P}: por execução, por dia"}}
 """
+    if with_tasks:
+        origin = ", ".join([nid("REQ")] + ([nid("NFR")] if with_design else []))
+        out += f"""
+tasks:
+  - id: T-01
+    title: "{P}: unidade pequena de trabalho"
+    origin: [{origin}]
+    done_when: "{P}: evidência observável de conclusão"
+"""
     out += f"""
 invariants: []
 quality_gates: []
@@ -141,7 +165,8 @@ def create(root: Path, name: str, size: str = "medium", acs: int = 1) -> tuple[P
     with_design = _design_required(root, size)
     path = folder / "spec.yaml"
     with_limits = with_design and (root / "specs/agents.yaml").exists()
-    path.write_text(render(name, size, acs, ids, with_design, with_limits), encoding="utf-8")
+    path.write_text(render(name, size, acs, ids, with_design, with_limits,
+                           _tasks_required(root, size)), encoding="utf-8")
     allocated = {"REQ": f"REQ-{ids['REQ'] + 1:03d}",
                  "AC": ", ".join(f"AC-{ids['AC'] + i:03d}" for i in range(1, acs + 1))}
     if with_design:

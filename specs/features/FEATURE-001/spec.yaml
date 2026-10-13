@@ -352,6 +352,59 @@ requirements:
         when: o relatório é gerado
         then: os efeitos proibidos aparecem junto do resultado esperado
 
+  - id: REQ-017
+    description: Tarefas rastreáveis da origem à evidência.
+    acceptance:
+      - id: AC-073
+        given: tarefas com origem, evidência ou dependência inexistente, ou ID repetido
+        when: as specs são carregadas
+        then: cada problema é reportado; origem pode ser REQ, AC, NFR, EVAL, ARCH ou CONST
+      - id: AC-074
+        given: dependências entre tarefas que formam ciclo
+        when: as specs são carregadas
+        then: o ciclo é reportado com o caminho completo
+      - id: AC-075
+        given: um AC, NFR ou EVAL que nenhuma tarefa cita
+        when: as specs são carregadas
+        then: é reportado como requisito órfão; citar o REQ cobre todos os seus ACs
+      - id: AC-076
+        given: uma tarefa done
+        when: as specs são carregadas ou o check roda
+        then: exige evidência, e evidência que não passa reprova o check
+      - id: AC-077
+        given: require_tasks ativo
+        when: uma spec de size exigido não tem tarefas
+        then: a ausência é reportada como erro
+  - id: REQ-018
+    description: Constituição executável.
+    acceptance:
+      - id: AC-078
+        given: princípios em specs/constitution.yaml
+        when: as specs são carregadas
+        then: cada um exige enforced_by válido (ARCH, AC, NFR, EVAL, gate, kit, profile) ou manual
+      - id: AC-079
+        given: uma constituição com princípios cobrados por testes, gates e revisão manual
+        when: sdd check roda
+        then: os gates citados rodam e o relatório mostra cada princípio como COBRADO, VIOLADO ou MANUAL
+  - id: REQ-019
+    description: Detectar critérios de aceitação vagos.
+    acceptance:
+      - id: AC-080
+        given: um critério com termos vagos e nenhum valor numérico
+        when: as specs são carregadas
+        then: é aviso por padrão e erro com strict_criteria, sem falso positivo em palavras compostas
+  - id: REQ-020
+    description: Correção de bug sem mudar a spec, comprovada por teste de regressão.
+    acceptance:
+      - id: AC-081
+        given: código alterado sem spec, com SDD-Fix citando um critério e teste alterado que cita o ID
+        when: sdd diff roda
+        then: o diff aprova e registra a correção e o teste de regressão
+      - id: AC-082
+        given: SDD-Fix sem teste alterado que cite o ID, ou citando ID inexistente
+        when: sdd diff roda
+        then: o diff reprova
+
 design:
   numbers:
     - id: NFR-001

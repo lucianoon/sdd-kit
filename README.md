@@ -30,10 +30,33 @@ sdd profile     # matriz do perfil de agentes: módulos, requisitos e evidência
 sdd schema      # JSON Schema da spec (autocomplete no editor, outras ferramentas)
 ```
 
-O fluxo que o `AGENTS.md` gerado ensina ao agente: **dimensionar → especificar → desenhar
-→ quebrar em tarefas → implementar → verificar**, com profundidade proporcional ao `size`.
-O `sdd` não confia que o agente seguiu o fluxo: cada etapa deixa um artefato que um comando
-verifica.
+## O ciclo, etapa por etapa
+
+O `AGENTS.md` gerado ensina ao agente as sete etapas do SDD, cada uma com o que fazer, o que
+**não** fazer e quando está pronta. O `sdd` não confia que o agente seguiu o ciclo: cada
+etapa deixa um artefato que um comando verifica.
+
+| Etapa | Artefato | Quem verifica |
+|---|---|---|
+| 0 Constituição | `specs/constitution.yaml` | `validate` (cada princípio tem cobrança); `check` (estado de cada um) |
+| 1 Especificação | `spec.yaml` (REQ, AC, fora de escopo) | `specify` gera; `validate` cobra campos e avisa critério vago |
+| 2 Clarificação | `open_questions`, `assumptions` | pergunta aberta bloqueia o `validate` |
+| 3 Plano | `design` (números, fluxo, alternativas, riscos, dependências, limites) | `validate` |
+| 4 Tarefas | `tasks` (origem, dependências, evidência) | `validate` (órfãos, ciclos, origens); `check` (tarefa done com evidência falhando) |
+| 5 Análise | — | `validate` cruza tudo, de forma determinística |
+| 6 Implementação | código, testes, commits | `check`, `diff`, `mutate`, `eval`, `arch` |
+
+### Tratamento de mudanças
+
+| Situação | O que fazer | O `sdd diff` cobra |
+|---|---|---|
+| Mudou o comportamento desejado | atualize a spec primeiro | spec alterada junto com o código |
+| Bug: código descumpre uma spec correta | corrija e acrescente teste de regressão | `SDD-Fix: AC-012` no commit **e** um arquivo de teste alterado que cite `AC-012` |
+| Mudou só a solução técnica | preserve o comportamento | `SDD-No-Spec-Change: <motivo>` no commit |
+
+Correção sem teste de regressão reprova: "corrigi" sem um teste que pegaria o bug de volta
+não comprova nada. Onde ficam os testes: `tests.paths` em `specs/sdd.yaml` (padrão cobre
+`tests/`, `test_*.py`, `*_test.go`, `*.test.*`, `*.spec.*`, `src/test/`).
 
 ## Começando uma feature
 
@@ -143,6 +166,56 @@ decisions: [AD-001]   # decisões de projeto que a feature segue
 `specs/decisions.yaml` guarda as decisões que valem para todas as features (`AD-NNN`).
 Decisão substituída fica no histórico com `status: superseded` e `superseded_by`; spec que
 ainda referencia uma decisão substituída não valida.
+
+## Tarefas: `tasks`
+
+```yaml
+tasks:
+  - id: T-01
+    title: Persistir agendamentos
+    origin: [REQ-002]              # REQ/AC/NFR/EVAL desta spec, ARCH ou CONST
+    done_when: migração aplica e registros persistem
+    status: done
+    evidence: [AC-004]
+  - id: T-02
+    title: Impedir reservas concorrentes
+    origin: [AC-005]
+    depends_on: [T-01]
+    done_when: teste concorrente comprova uma única reserva
+```
+
+O `validate` reprova tarefa sem origem válida, dependência inexistente ou em ciclo (mostra
+o caminho), tarefa `done` sem evidência e **requisito órfão**: AC, NFR ou EVAL que nenhuma
+tarefa cita (citar o REQ cobre todos os seus ACs). O `check` reprova tarefa `done` cuja
+evidência não passa. Com `require_tasks: true` (padrão no `init`), specs `large`/`complex`
+precisam de tarefas.
+
+## Constituição executável: `specs/constitution.yaml`
+
+```yaml
+principles:
+  - id: CONST-01
+    rule: A aplicação verifica autorização fora do modelo de linguagem.
+    enforced_by: [ARCH-001, AC-014]         # ARCH, AC/NFR/EVAL, gate:<nome>, kit:<recurso>, profile:<req>
+  - id: CONST-02
+    rule: Segredos não aparecem no código.
+    enforced_by: [gate:segredos]            # o gate roda no check mesmo que nenhuma spec o peça
+  - id: CONST-03
+    rule: Novas dependências exigem justificativa registrada.
+    manual: decisão em decisions.yaml revisada no PR
+```
+
+Todo princípio precisa de cobrança ou de procedimento manual, e o `check` mostra cada um
+como `COBRADO`, `VIOLADO` ou `MANUAL`. Assim fica explícito o que o projeto garante por
+ferramenta e o que depende de gente. Os IDs são `CONST-NN` (e não `C-NN`) para não colidir
+com o módulo Cache do perfil de agentes.
+
+## Critério vago
+
+`then: "o agente responde corretamente"` não define resultado observável. O `validate`
+avisa quando um critério usa termos como "rápido", "seguro", "corretamente", "adequado" ou
+"fácil" (e equivalentes em inglês) sem nenhum valor numérico. Com `strict_criteria: true`,
+vira erro. "Lista em até 300 ms com 10 mil registros" passa.
 
 ## Desenho arquitetural: seção `design`
 
@@ -532,6 +605,10 @@ agente, não verificação). Elas combinam bem com o sdd-kit se você usar a ski
 Este repositório se verifica: `sdd check` na raiz roda a spec em `specs/features/FEATURE-001`.
 
 ## Créditos
+
+O ciclo de sete etapas, as tarefas rastreáveis, a constituição com IDs e o tratamento de
+mudanças vêm do *Guia SDD para Agentes de IA* (Luciano Oliveira Nunes), baseado no vídeo
+"Este é o futuro do desenvolvimento de software", do canal Balta.
 
 O perfil de agentes é derivado da *SPEC-BASE v0.1 — Aplicações de agentes de IA*
 (Luciano Oliveira Nunes, 13/10/2026), condensada e acrescida do módulo L (LGPD/PL 2338).
