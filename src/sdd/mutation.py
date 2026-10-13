@@ -154,11 +154,32 @@ def _copy_project(root: Path, link: list[str]) -> Path:
     def ignore(d, names):
         return [n for n in names if n in ignore_always or n in link or n.endswith(".egg-info")]
 
-    shutil.copytree(root, dest, ignore=ignore, symlinks=True)
+    try:
+        shutil.copytree(root, dest, ignore=ignore, symlinks=True)
+    except BaseException:
+        shutil.rmtree(dest.parent, ignore_errors=True)  # não copiando inteiro, não deixa lixo
+        raise
     for name in link:  # dependências pesadas: referência, não cópia
         if (root / name).exists():
             (dest / name).symlink_to((root / name).resolve())
     return dest
+
+
+def sweep_stale(max_age: float = 24 * 3600) -> int:
+    """Remove cópias de trabalho órfãs de runs anteriores (ex.: sdd morto à força).
+
+    Só toca em diretórios com o prefixo próprio de mutate e mais velhos que `max_age`
+    (24 h): uma execução concorrente legítima nunca é apagada.
+    """
+    removed = 0
+    for d in Path(tempfile.gettempdir()).glob("sdd-mutate-*"):
+        try:
+            if d.is_dir() and time.time() - d.stat().st_mtime >= max_age:
+                shutil.rmtree(d, ignore_errors=True)
+                removed += 1
+        except OSError:
+            continue
+    return removed
 
 
 class _Clock:
@@ -219,6 +240,7 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
         return rep
 
     cmd = cfg.command or proj.config.tests.command
+    sweep_stale()  # órfãos de execuções mortas não se acumulam no disco
     work = _copy_project(proj.root, cfg.link)
     clock = _Clock()
     try:

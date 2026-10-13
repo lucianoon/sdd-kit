@@ -200,6 +200,40 @@ def test_ac_033_fim_de_string_escape_e_bloco_de_comentario(tmp_path):
     assert [(m.line, m.col) for m in candidates(tmp_path, ["b.ts"])] == [(4, 14)]
 
 
+def test_ac_088_orfaos_de_execucoes_mortas_sao_removidos(tmp_path, monkeypatch):
+    # pastas sdd-mutate-* velhas de execuções mortas à força: limpas ao iniciar o mutate
+    import os
+    import time
+    import tempfile as tf
+
+    from sdd.mutation import sweep_stale
+
+    monkeypatch.setattr(tf, "gettempdir", lambda: str(tmp_path))
+    velha = tmp_path / "sdd-mutate-velha"
+    (velha.mkdir(),)
+    os.utime(velha, (time.time() - 25 * 3600,) * 2)  # 25 horas atrás
+    recente = tmp_path / "sdd-mutate-recente"        # de uma execução concorrente
+    recente.mkdir()
+    assert sweep_stale() >= 1
+    assert velha.exists() is False and recente.exists() is True
+
+
+def test_ac_088_arvores_de_outros_sistemas_nao_sao_tocadas(tmp_path, monkeypatch):
+    import tempfile as tf
+
+    from sdd.mutation import sweep_stale
+
+    monkeypatch.setattr(tf, "gettempdir", lambda: str(tmp_path))
+    (tmp_path / "sdd-mutate-alien").mkdir()
+    (tmp_path / "arquivo-cru").write_text(encoding="utf-8", data="x")
+    (tmp_path / "outro-DA-ferramenta").mkdir()
+    # só o prefixo próprio é candidato; max_age gigante não remove nada
+    sweep_stale(max_age=10**9)
+    assert (tmp_path / "sdd-mutate-alien").exists()
+    sweep_stale(max_age=0)
+    assert (tmp_path / "sdd-mutate-alien").exists() is False
+
+
 def test_copia_isolada_ignora_git_e_referencia_dependencias(tmp_path):
     from sdd.mutation import _copy_project
     root = tmp_path / "proj"

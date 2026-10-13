@@ -168,11 +168,11 @@ def diff(
 
     proj = _load_or_exit(root)
     try:
-        changed, messages = changes(root, base)
+        changed, messages, merge_base = changes(root, base)
     except GitError as exc:
         _err(exc)
         raise typer.Exit(2)
-    res = evaluate(proj, changed, messages)
+    res = evaluate(proj, changed, messages, merge_base)
     for w in res.warnings:
         _warn(w)
     for v in res.violations:

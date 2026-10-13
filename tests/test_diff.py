@@ -121,6 +121,37 @@ def test_ac_054_falha_do_git_sai_com_2(repo):
     assert r.exit_code == 2
 
 
+def test_ac_087_edicao_cosmetica_da_spec_nao_libera_codigo(repo):
+    # só acrescenta comentário e muda espaçamento: o conteúdo é o mesmo
+    write(repo, "src/pedidos/api.py", "x = 2\n")
+    write(repo, "specs/features/FEATURE-001/spec.yaml", "# revisado pelo analista\n" + SPEC + "\n")
+    commit(repo)
+    r = run_diff(repo)
+    assert r.exit_code == 1, r.output
+    assert "pedidos: código alterado sem mudança" in r.stderr
+
+
+def test_ac_087_semantica_documentada(repo):
+    from sdd.diff import semantic_hash
+
+    base = "feature: p\nversion: 1\nrequirements: []\n"
+    cosmetic = ("# cabeçalho comentado\n"
+                "version: 1\nfeature: p\n  \n"
+                "requirements: []\n")  # chaves reordenadas, comentário e espaços extras
+    assert semantic_hash(base) == semantic_hash(cosmetic)
+    assert semantic_hash(base) != semantic_hash(base.replace("version: 1", "version: 2"))
+    assert semantic_hash("") == semantic_hash("  \n")  # vazio e só espaço são o mesmo vazio
+
+
+def test_ac_088_mudanca_comentarios_alienigenas(repo):
+    # YAML quebrado: compara como texto cru e aceita mudança real
+    from sdd.diff import semantic_hash
+
+    broken = "feature: [\n  a, b\n"
+    assert semantic_hash(broken) != semantic_hash(broken + "  c\n")
+    assert semantic_hash(broken + "\n") == semantic_hash(broken)
+
+
 @pytest.mark.parametrize("path,pattern,ok", [
     ("src/a/b/c.py", "src/**", True),
     ("src/c.py", "src/*.py", True),

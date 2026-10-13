@@ -5,6 +5,7 @@ Cada pasta é um projeto sdd independente, verificado no CI a cada commit
 
 | Pasta | Runner | Como o JUnit é gerado | Convenções de nome reconhecidas |
 |---|---|---|---|
+| `pytest/` | pytest 8+ | `--junitxml` | `test_ac_001_...`, `def testAC001`, IDs em parametrize |
 | `jest/` | jest 30 | jest-junit 17 | `it("AC-001 ...")`, `describe("AC-003 ...")`, `test.each("AC-004 ...")` |
 | `vitest/` | vitest 5 | reporter `junit` nativo | as mesmas do jest |
 | `go/` | go test | go-junit-report | `TestAC_001_X`, `TestAC001X`, `t.Run("AC-003 ...")` |

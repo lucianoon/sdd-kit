@@ -15,7 +15,8 @@ O que o kit não garante, de onde vieram as ideias e o que vem depois.
   verifica exatamente o `then` do AC-001. Isso continua sendo revisão humana.
 - A mutação é textual: pode gerar mutantes equivalentes (sobrevivem sem culpa dos testes),
   e só cobre operadores, não remoção de linhas ou troca de constantes. Execução interrompida
-  à força (kill) pode deixar a cópia em `/tmp/sdd-mutate-*`.
+  à força (kill) pode deixar a cópia em `/tmp/sdd-mutate-*`; o próximo `mutate` remove as
+  órfãs mais velhas que 24 horas.
 - `size` é declarado por quem escreve a spec; a única trava objetiva é o número de arquivos.
 - O `arch` lê imports como texto: não vê dependências indiretas (A importa B que importa
   infra), import dinâmico por string montada em tempo de execução, nem injeção por
@@ -34,8 +35,9 @@ O que o kit não garante, de onde vieram as ideias e o que vem depois.
 - Um NFR testado no CI aproxima, mas não substitui, medição em produção (SLO/observabilidade).
   Números sem `id` orientam o desenho mas não são verificados.
 - O `diff` detecta divergência **por mudança** (código mexeu, spec não), não por conteúdo:
-  qualquer edição na pasta da spec satisfaz a regra. O revisor ainda confere se a edição
-  descreve a mudança. O trailer de exceção vale para o intervalo inteiro, não por feature.
+  edição semântica na spec (valores ou estrutura) satisfaz a regra; comentário, espaço e
+  reordenação de chaves não contam. O revisor ainda confere se a edição descreve a mudança.
+  O trailer de exceção vale para o intervalo inteiro, não por feature.
 - Sem orçamento de autonomia executável (hoje é texto na constituição) e sem
   `specify`/`plan` assistidos.
 
