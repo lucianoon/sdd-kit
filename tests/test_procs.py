@@ -45,3 +45,14 @@ def test_ac_059_timeout_mata_o_processo_neto(tmp_path):
 def test_run_shell_saida_e_codigo(tmp_path):
     r = run_shell(f"{PY} -c \"print('olá'); raise SystemExit(3)\"", tmp_path, timeout=30)
     assert r.returncode == 3 and not r.timed_out and "olá" in r.output
+
+
+def test_ac_059_saida_em_codificacao_do_sistema_e_decodificada():
+    from sdd.procs import _decode
+    assert _decode("olá".encode("utf-8")) == "olá"
+    assert "ol" in _decode("olá".encode("cp1252"))  # não quebra nem perde o resto
+
+
+def test_filho_python_recebe_utf8(tmp_path):
+    r = run_shell(f"{PY} -c \"import os; print(os.environ.get('PYTHONIOENCODING'))\"", tmp_path, 30)
+    assert "utf-8" in r.output

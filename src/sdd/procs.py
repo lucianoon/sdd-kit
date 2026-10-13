@@ -7,6 +7,7 @@ e o timeout mata o grupo (POSIX) ou a árvore (Windows).
 """
 from __future__ import annotations
 
+import locale
 import os
 import signal
 import subprocess
@@ -31,7 +32,19 @@ def _kill_tree(p: subprocess.Popen) -> None:
             pass
 
 
+def _decode(data: bytes) -> str:
+    """UTF-8 primeiro; se não for válido, a codificação do sistema (ex.: cp1252 no Windows)."""
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        system = (locale.getencoding() if hasattr(locale, "getencoding")  # Python 3.11+
+                  else locale.getpreferredencoding(False))
+        return data.decode(system or "utf-8", errors="replace")
+
+
 def run_shell(cmd: str, cwd, timeout: int, env: dict | None = None) -> Result:
+    env = dict(os.environ if env is None else env)
+    env.setdefault("PYTHONIOENCODING", "utf-8")  # filhos Python escrevem UTF-8 no pipe
     kwargs = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == "win32" \
         else {"start_new_session": True}
     p = subprocess.Popen(cmd, shell=True, cwd=cwd, env=env, stdout=subprocess.PIPE,
@@ -41,6 +54,5 @@ def run_shell(cmd: str, cwd, timeout: int, env: dict | None = None) -> Result:
     except subprocess.TimeoutExpired:
         _kill_tree(p)
         out, err = p.communicate()
-        text = (out + err).decode("utf-8", errors="replace")
-        return Result(-1, text, True)
-    return Result(p.returncode, (out + err).decode("utf-8", errors="replace"), False)
+        return Result(-1, _decode(out + err), True)
+    return Result(p.returncode, _decode(out + err), False)
