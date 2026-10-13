@@ -95,6 +95,11 @@ requirements:
         given: alterações não commitadas e arquivos não rastreados
         when: sdd diff roda
         then: essas alterações entram na avaliação
+      - id: AC-087
+        given: edição na spec que não muda o conteúdo (só comentário, espaço em branco ou ordem de chaves)
+        when: sdd diff roda
+        then: a edição não conta como mudança de spec e o código alterado continua reprovando
+        forbidden: [editar a spec de forma cosmética para liberar código]
   - id: REQ-006
     description: Exigir desenho arquitetural explícito e verificável antes da implementação.
     acceptance:
@@ -178,6 +183,10 @@ requirements:
         given: operadores dentro de strings, comentários ou linhas com sdd no-mutate
         when: os candidatos são gerados
         then: esses trechos não são mutados
+      - id: AC-088
+        given: cópias de trabalho órfãs de execuções mortas à força em specs/sdd-mutate-*
+        when: o mutate inicia
+        then: as cópias mais velhas que 24 h são removidas e as recentes, de execuções concorrentes, preservadas
   - id: REQ-011
     description: Verificar comportamento não determinístico (LLM) com critérios estatísticos.
     acceptance:

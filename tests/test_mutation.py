@@ -200,6 +200,87 @@ def test_ac_033_fim_de_string_escape_e_bloco_de_comentario(tmp_path):
     assert [(m.line, m.col) for m in candidates(tmp_path, ["b.ts"])] == [(4, 14)]
 
 
+def test_ac_088_orfaos_de_execucoes_mortas_sao_removidos(tmp_path, monkeypatch):
+    # pastas sdd-mutate-* velhas de execuções mortas à força: limpas ao iniciar o mutate
+    import os
+    import time
+    import tempfile as tf
+
+    from sdd.mutation import sweep_stale
+
+    monkeypatch.setattr(tf, "gettempdir", lambda: str(tmp_path))
+    velha = tmp_path / "sdd-mutate-velha"
+    (velha.mkdir(),)
+    os.utime(velha, (time.time() - 25 * 3600,) * 2)  # 25 horas atrás
+    recente = tmp_path / "sdd-mutate-recente"        # de uma execução concorrente
+    recente.mkdir()
+    assert sweep_stale() >= 1
+    assert velha.exists() is False and recente.exists() is True
+
+
+def test_ac_088_arvores_de_outros_sistemas_nao_sao_tocadas(tmp_path, monkeypatch):
+    import tempfile as tf
+
+    from sdd.mutation import sweep_stale
+
+    monkeypatch.setattr(tf, "gettempdir", lambda: str(tmp_path))
+    (tmp_path / "sdd-mutate-alien").mkdir()
+    (tmp_path / "arquivo-cru").write_text(encoding="utf-8", data="x")
+    (tmp_path / "outro-DA-ferramenta").mkdir()
+    # só o prefixo próprio é candidato; max_age gigante não remove nada
+    sweep_stale(max_age=10**9)
+    assert (tmp_path / "sdd-mutate-alien").exists()
+    sweep_stale(max_age=0)
+    assert (tmp_path / "sdd-mutate-alien").exists() is False
+
+
+def test_ac_088_rmtree_do_sweep_ignora_erros(tmp_path, monkeypatch):
+    import shutil as sh
+    import tempfile as tf
+
+    from sdd import mutation
+
+    vistos = []
+
+    def espião(path, ignore_errors=False, **kw):
+        vistos.append(ignore_errors)
+        if not ignore_errors:
+            raise PermissionError(path)  # mutant True→False morre aqui
+
+    monkeypatch.setattr(sh, "rmtree", espião)
+    monkeypatch.setattr(tf, "gettempdir", lambda: str(tmp_path))
+    (tmp_path / "sdd-mutate-velha").mkdir()
+    assert mutation.sweep_stale(max_age=0) == 1
+    assert vistos == [True]  # sem ignore_errors, um diretório travado derrubaria o mutate
+
+
+def test_ac_088_copias_mal_nascidas_nao_deixam_lixo(tmp_path, monkeypatch):
+    import shutil as sh
+
+    from sdd.mutation import _copy_project
+
+    # copytree que falha a meio (legítimo: disco cheio) NÃO pode deixar a pasta para trás
+    monkeypatch.setattr(sh, "copytree",
+                        lambda src, dst, **kw: (_ for _ in ()).throw(OSError("disco cheio")))
+    vistos = []
+    real_rmtree = sh.rmtree
+
+    def espião(path, ignore_errors=False, **kw):
+        vistos.append(ignore_errors)
+        return real_rmtree(path, ignore_errors=ignore_errors)
+
+    monkeypatch.setattr(sh, "rmtree", espião)
+    try:
+        _copy_project(tmp_path, [])
+    except OSError:
+        pass
+    else:
+        raise AssertionError("falha de copytree deveria propagar")
+    left = list(tmp_path.glob("sdd-mutate-*"))
+    assert left == [], left
+    assert vistos == [True]  # a limpeza da pasta mal nascida roda e tolera erros
+
+
 def test_copia_isolada_ignora_git_e_referencia_dependencias(tmp_path):
     from sdd.mutation import _copy_project
     root = tmp_path / "proj"

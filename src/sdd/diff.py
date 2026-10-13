@@ -1,4 +1,8 @@
-"""Detecção de divergência por mudança: código e spec precisam andar juntos."""
+"""Detecção de divergência por mudança: código e spec precisam andar juntos.
+
+A comparação da spec é semântica: comentários, espaços e reordenação de chaves não
+contam como mudança. Assim, tocar a spec de forma cosmética não libera código alterado.
+"""
 from __future__ import annotations
 
 import re
@@ -6,6 +10,8 @@ import subprocess
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+
+import yaml
 
 from .core import Project
 
@@ -55,14 +61,41 @@ def _git(root: Path, *args: str) -> str:
     return p.stdout
 
 
-def changes(root: Path, base: str) -> tuple[list[str], str]:
+def changes(root: Path, base: str) -> tuple[list[str], str, str]:
     """Arquivos alterados desde o merge-base com `base` (inclui não commitados e
-    não rastreados) e as mensagens de commit do intervalo."""
+    não rastreados), as mensagens de commit do intervalo e o merge-base."""
     mb = _git(root, "merge-base", base, "HEAD").strip()
     files = set(_git(root, "diff", "--name-only", mb).split())
     files |= set(_git(root, "ls-files", "--others", "--exclude-standard").split())
     messages = _git(root, "log", "--format=%B", f"{mb}..HEAD")
-    return sorted(files), messages
+    return sorted(files), messages, mb
+
+
+def semantic_hash(text: str) -> str:
+    """Hash do conteúdo da spec sem ruído: sem comentários e espaço irrelevante.
+
+    Comment-only defuses: uma edição que só acrescenta comentário (ou reordena chaves,
+    muda aspas ou espaçamento) produz o mesmo hash e não libera o diff.
+
+    Comentários de linha (`#`) e de bloco são removidos antes do parse — YAML não os
+    preserva de todo jeito; remover antes evia falsa diferença por formatação.
+    """
+    body = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
+    try:
+        data = yaml.safe_load(body) or {}
+    except yaml.YAMLError:
+        return repr(("ilegível", body.strip()))  # YAML quebrado: compara como texto cru
+    return repr(_canon(data))
+
+
+def _canon(obj):
+    """Representação canônica: dicts ordenados por chave, listas preservam a ordem
+    (lista tem semântica posicional: reordenar critérios muda o documento)."""
+    if isinstance(obj, dict):
+        return {k: _canon(v) for k, v in sorted(obj.items())}
+    if isinstance(obj, list):
+        return [_canon(v) for v in obj]
+    return obj
 
 
 @dataclass
@@ -96,7 +129,34 @@ def _regression_tests(proj: Project, changed: list[str], ids: set[str]) -> dict[
     return found
 
 
-def evaluate(proj: Project, changed: list[str], messages: str) -> DiffResult:
+def _git_show(root: Path, ref: str, path: str) -> str | None:
+    """Conteúdo de um arquivo num commit; None se não existe."""
+    try:
+        return _git(root, "show", f"{ref}:{path}")
+    except GitError:
+        return None
+
+
+def _meaningful_spec_change(root: Path, rel: str, base: str) -> bool:
+    """A spec mudou *de verdade*? Compara o conteúdo parseado com a versão na base.
+
+    Comentário, espaço e ordem de chaves não contam; qualquer valor de conteúdo sim.
+    O `base` já é o merge-base calculado pelo `changes`.
+    """
+    try:
+        old = _git_show(root, base, rel)
+    except GitError:
+        return True  # arquivo novo (não existe na base) ou git indisponível: conserva
+    try:
+        new = (root / rel).read_text(encoding="utf-8")
+    except (UnicodeDecodeError, FileNotFoundError):
+        return True
+    if old is None:
+        return True  # spec nova: a mudança é real
+    return semantic_hash(old) != semantic_hash(new)
+
+
+def evaluate(proj: Project, changed: list[str], messages: str, merge_base: str = "HEAD") -> DiffResult:
     res = DiffResult(changed=changed)
     m = TRAILER.search(messages)
     res.override = m.group(1).strip() if m else None
@@ -111,7 +171,9 @@ def evaluate(proj: Project, changed: list[str], messages: str) -> DiffResult:
     owned: set[str] = set()
     for rel, spec in proj.specs.items():
         spec_dir = rel.rsplit("/", 1)[0] + "/"
-        spec_changed = any(f.startswith(spec_dir) for f in changed)
+        touched = any(f.startswith(spec_dir) for f in changed)
+        # Mudança cosmética na spec (só comentário/espaço/ordem de chave) não libera código.
+        spec_changed = touched and _meaningful_spec_change(proj.root, rel, merge_base)
         code = [f for f in changed if spec.paths and matches(f, spec.paths)]
         owned.update(code)
         limit = proj.config.small_max_files if proj.config else 3

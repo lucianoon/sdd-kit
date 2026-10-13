@@ -25,7 +25,7 @@ def _verdict(ok: bool, tail: str) -> None:
     """Linha final de um comando. Cores só em terminal; no CI a saída sai limpa."""
     typer.echo("")
     typer.secho("APROVADO" if ok else "REPROVADO", fg=typer.colors.GREEN if ok else typer.colors.RED,
-                bold=True, nl=False)
+                bold=True, nl=False)  # sdd: no-mutate (cores: mudança só de apresentação)
     typer.echo(f" — {tail}" if tail else "")
 
 
@@ -168,11 +168,11 @@ def diff(
 
     proj = _load_or_exit(root)
     try:
-        changed, messages = changes(root, base)
+        changed, messages, merge_base = changes(root, base)
     except GitError as exc:
         _err(exc)
         raise typer.Exit(2)
-    res = evaluate(proj, changed, messages)
+    res = evaluate(proj, changed, messages, merge_base)
     for w in res.warnings:
         _warn(w)
     for v in res.violations:

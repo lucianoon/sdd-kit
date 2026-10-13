@@ -42,7 +42,12 @@ não rastreados.
 | Arquivo em `code` mudou e nenhuma feature o declara | **reprova** (código sem dono) |
 | Código e spec da feature mudaram juntos | aprova |
 | Só a spec mudou | aprova com aviso (spec-first é legítimo) |
+| Spec editada sem mudar o conteúdo (comentário, espaço, ordem de chaves) e o código mudou | **reprova** — edição cosmética não conta como mudança de spec |
 | Arquivo fora de `code` (docs, CI...) | ignorado |
+
+A comparação da spec é **semântica**: o `diff` compara o documento YAML (valores e
+estrutura), não o texto. Acrescentar um comentário ou reformatar a spec produz a mesma
+ impressão; tais edições não liberam código.
 
 **Refatoração sem mudança de comportamento** não precisa mexer na spec. Declare no commit:
 

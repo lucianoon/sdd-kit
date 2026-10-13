@@ -1,0 +1,5 @@
+tests:
+  # pytest grava o JUnit via --junitxml. O ID pode estar em qualquer parte do nome
+  # do teste (test_ac_001_...) ou ser citado em literais de projeção parametrizadas.
+  command: "python -m pytest -q --junitxml=.sdd/junit.xml"
+  junit: .sdd/junit.xml

@@ -104,6 +104,7 @@ O `AGENTS.md` gerado ensina esse ciclo ao agente, com o que fazer e o que não f
 
 ## Documentação
 
+- [Changelog](CHANGELOG.md): o que mudou em cada versão
 - [Especificação](docs/especificacao.md): specs, rastreio, convenções por stack, size, premissas, tarefas
 - [Verificação contínua](docs/verificacao.md): `diff`, `SDD-Fix`, `mutate`
 - [Desenho arquitetural](docs/design.md): números, alternativas, riscos, modos de falha
