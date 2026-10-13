@@ -15,7 +15,7 @@ NUCLEO = [r.id for r in catalog().modules["N"].requirements]
 
 
 def init(root: Path) -> Path:
-    assert runner.invoke(app, ["init", "--profile", "agentes", "-C", str(root)]).exit_code == 0
+    assert runner.invoke(app, ["init", "--preset", "padrao", "--profile", "agentes", "-C", str(root)]).exit_code == 0
     return root
 
 

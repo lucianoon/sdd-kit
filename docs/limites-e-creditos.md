@@ -1,0 +1,75 @@
+# Limites, origem e créditos
+
+O que o kit não garante, de onde vieram as ideias e o que vem depois.
+
+## Agnosticismo
+
+- **De agente:** as instruções ficam em `AGENTS.md`. Se a sua ferramenta lê outro arquivo
+  (ex.: `CLAUDE.md`), aponte-o para o `AGENTS.md` em vez de duplicar regras.
+- **De linguagem:** o motor só conhece comandos de shell e JUnit XML.
+
+## Limites conhecidos
+
+- O rastreio prova que existe um teste **nomeado** para o AC e que ele passa. O `mutate`
+  prova que os testes da feature detectam código errado, mas não que o teste do AC-001
+  verifica exatamente o `then` do AC-001. Isso continua sendo revisão humana.
+- A mutação é textual: pode gerar mutantes equivalentes (sobrevivem sem culpa dos testes),
+  e só cobre operadores, não remoção de linhas ou troca de constantes. Execução interrompida
+  à força (kill) pode deixar a cópia em `/tmp/sdd-mutate-*`.
+- `size` é declarado por quem escreve a spec; a única trava objetiva é o número de arquivos.
+- O `arch` lê imports como texto: não vê dependências indiretas (A importa B que importa
+  infra), import dinâmico por string montada em tempo de execução, nem injeção por
+  reflexão. Cobre o caso comum; para o resto, ferramentas dedicadas como gates.
+- `dependencies` garante que o modo de falha foi **declarado e tem teste ligado**, não que
+  o teste simula a falha de verdade. Revisão humana confere.
+- O `eval` garante a aritmética e a integridade dos resultados, não a **qualidade do
+  dataset**: um dataset fácil demais ou que não representa produção aprova um agente ruim.
+  Também não impede um harness que grava `pass: true` sem chamar o modelo; isso é código
+  revisável no PR, como qualquer teste.
+- Evals no CI medem antes do merge. Deriva do modelo e comportamento em produção pedem
+  observabilidade e evals contínuos sobre tráfego real, fora do escopo do kit.
+- `invariants` e `out_of_scope` são documentados, não verificados.
+- A seção `design` garante que a análise **existe e tem estrutura**, não que é **boa**:
+  duas alternativas de fachada passam no validador, e `source` não prova que o número é real.
+- Um NFR testado no CI aproxima, mas não substitui, medição em produção (SLO/observabilidade).
+  Números sem `id` orientam o desenho mas não são verificados.
+- O `diff` detecta divergência **por mudança** (código mexeu, spec não), não por conteúdo:
+  qualquer edição na pasta da spec satisfaz a regra. O revisor ainda confere se a edição
+  descreve a mudança. O trailer de exceção vale para o intervalo inteiro, não por feature.
+- Sem orçamento de autonomia executável (hoje é texto na constituição) e sem
+  `specify`/`plan` assistidos.
+
+## O que veio da TLC Spec-Driven
+
+Ideias da [TLC Spec-Driven](https://agent-skills.techleads.club/tlc-spec-driven/)
+(Felipe Rodrigues, Tech Leads Club), reimplementadas como verificação determinística:
+
+| Ideia na TLC | Como ficou aqui |
+|---|---|
+| Profundidade ajustada à complexidade | `size` + `design_required_for` + trava no `diff` |
+| Requirement closure gate | `open_questions` sem resposta bloqueiam o `validate` |
+| Tabela de premissas | `assumptions` com padrão escolhido e justificativa obrigatórios |
+| Decisões de projeto (AD-NNN) | `specs/decisions.yaml`, referências validadas |
+| Discrimination sensor (LLM injeta falhas) | `sdd mutate`, mutação determinística |
+| Fluxo por fases, testes derivados da spec, blast radius | `AGENTS.md` e constituição gerados |
+
+**Não trouxemos:** o verificador LLM como aprovador (conflita com "nenhuma aprovação depende
+de LLM"), a camada de lições aprendidas e a orquestração de sub-agentes (são processo do
+agente, não verificação). Elas combinam bem com o sdd-kit se você usar a skill da TLC junto.
+
+## Próximos passos sugeridos
+
+1. Orçamento de autonomia executável: caminhos protegidos que exigem aprovação (CODEOWNERS).
+2. Contratos: validar OpenAPI/JSON Schema contra a implementação como gate nativo.
+3. Trailer por feature (`SDD-No-Spec-Change(pedidos): ...`) para exceções mais estreitas.
+
+Este repositório se verifica: `sdd check` na raiz roda a spec em `specs/features/FEATURE-001`.
+
+## Créditos
+
+O ciclo de sete etapas, as tarefas rastreáveis, a constituição com IDs e o tratamento de
+mudanças vêm do *Guia SDD para Agentes de IA* (Luciano Oliveira Nunes), baseado no vídeo
+"Este é o futuro do desenvolvimento de software", do canal Balta.
+
+O perfil de agentes é derivado da *SPEC-BASE v0.1 — Aplicações de agentes de IA*
+(Luciano Oliveira Nunes, 13/10/2026), condensada e acrescida do módulo L (LGPD/PL 2338).

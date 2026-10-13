@@ -1,0 +1,102 @@
+# Verificação contínua
+
+Divergência entre código e spec (`sdd diff`), tratamento de mudanças e força dos testes (`sdd mutate`).
+
+### Tratamento de mudanças
+
+| Situação | O que fazer | O `sdd diff` cobra |
+|---|---|---|
+| Mudou o comportamento desejado | atualize a spec primeiro | spec alterada junto com o código |
+| Bug: código descumpre uma spec correta | corrija e acrescente teste de regressão | `SDD-Fix: AC-012` no commit **e** um arquivo de teste alterado que cite `AC-012` |
+| Mudou só a solução técnica | preserve o comportamento | `SDD-No-Spec-Change: <motivo>` no commit |
+
+Correção sem teste de regressão reprova: "corrigi" sem um teste que pegaria o bug de volta
+não comprova nada. Onde ficam os testes: `tests.paths` em `specs/sdd.yaml` (padrão cobre
+`tests/`, `test_*.py`, `*_test.go`, `*.test.*`, `*.spec.*`, `src/test/`).
+
+## Divergência: `sdd diff`
+
+O `check` garante que a spec atual está coberta. O `diff` garante que ela **continua sendo
+a verdade** quando o código muda. Cada spec declara o código que é dela:
+
+```yaml
+# specs/features/FEATURE-001/spec.yaml
+paths: ["src/pedidos/**"]
+```
+
+```yaml
+# specs/sdd.yaml
+code: ["src/**"]     # o que conta como código de produção
+```
+
+```bash
+sdd diff --base origin/main
+```
+
+Compara com o merge-base da branch alvo, incluindo alterações não commitadas e arquivos
+não rastreados.
+
+| Situação | Resultado |
+|---|---|
+| Arquivo em `paths` de uma feature mudou e a pasta da spec não | **reprova** |
+| Arquivo em `code` mudou e nenhuma feature o declara | **reprova** (código sem dono) |
+| Código e spec da feature mudaram juntos | aprova |
+| Só a spec mudou | aprova com aviso (spec-first é legítimo) |
+| Arquivo fora de `code` (docs, CI...) | ignorado |
+
+**Refatoração sem mudança de comportamento** não precisa mexer na spec. Declare no commit:
+
+```
+refactor: extrai validação de pedido
+
+SDD-No-Spec-Change: só reorganização interna, sem mudança de comportamento
+```
+
+O diff aprova e imprime o motivo. A exceção fica auditável no histórico do git, e a revisão
+humana decide se o motivo procede. Exit codes: `0` aprovado, `1` reprovado, `2` erro de git
+(ex.: base inexistente; no CI, use `fetch-depth: 0`).
+
+## Qualidade dos testes: `sdd mutate`
+
+O `check` prova que existe um teste com o ID e que ele passa. Não prova que o teste
+**verifica** algo: `def test_ac_001(): criar_pedido()` passa sem assert nenhum. O `mutate`
+fecha essa brecha sem LLM:
+
+1. Copia o projeto para um diretório temporário (o seu nunca é tocado).
+2. Confere que a suíte passa sem mutações (senão, sai com código 2).
+3. Para cada mutante, troca **um** operador no código dos `paths` da feature
+   (`>`→`<=`, `==`→`!=`, `and`→`or`, `True`→`False`, `+`→`-`...) e roda os testes.
+4. Testes falharam = mutante morto. Passaram = **sobreviveu**: aquele comportamento não é
+   verificado por ninguém.
+
+```
+$ sdd mutate
+== pedidos
+  killed    src/pedidos/regras.py:12      >=→<
+  survived  src/pedidos/regras.py:18      and→or
+  score 50% (mínimo 80%)
+REPROVADO — relatório em .sdd/mutation.md
+```
+
+```yaml
+# specs/sdd.yaml
+mutation:
+  min_score: 0.8
+  max_mutants: 50          # amostra determinística e espalhada: mesmo resultado em toda execução
+  timeout: 120             # por mutante; estouro (ex.: loop infinito) conta como morto
+  command: "pytest -q -x"  # padrão: tests.command. Falhar rápido acelera muito
+  env:
+    PYTHONPATH: "{root}/src"   # pacote instalado em modo editável apontaria para o original
+```
+
+- `--base origin/main` muta só os arquivos alterados no PR (é o que o workflow gerado faz).
+- `--feature pedidos` limita a uma feature; `--max 20` sobrescreve a amostra.
+- Linha com `sdd: no-mutate` é ignorada (para mutantes equivalentes, ex. log).
+- Strings, comentários, docstrings e imports não são mutados.
+
+**Custo:** cada mutante roda a suíte. Com uma suíte de 15 s, 50 mutantes levam até ~12 min.
+Use um `command` mais rápido (subconjunto, `-x`) e `--base` no CI.
+
+Para mutação mais profunda, ferramentas dedicadas (mutmut, Stryker, pitest, cargo-mutants)
+entram como `gates` comuns; o `mutate` embutido existe para funcionar em qualquer stack sem
+instalar nada.

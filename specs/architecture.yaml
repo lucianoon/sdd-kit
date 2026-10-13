@@ -12,6 +12,9 @@ rules:
       - src/sdd/textscan.py
       - src/sdd/profile.py
       - src/sdd/specify.py
+      - src/sdd/report.py
+      - src/sdd/analysis.py
+      - src/sdd/layers.py
     forbid: [typer, click]
     forbid_paths: [src/sdd/cli]
   - id: ARCH-002

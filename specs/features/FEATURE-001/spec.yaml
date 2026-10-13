@@ -405,6 +405,27 @@ requirements:
         when: sdd diff roda
         then: o diff reprova
 
+  - id: REQ-021
+    description: Adoção gradual — começar mínimo e ligar camadas quando fizerem sentido.
+    acceptance:
+      - id: AC-083
+        given: sdd init sem opções
+        when: o projeto é criado
+        then: surgem 4 arquivos com menos de 100 linhas no total, e o projeto valida
+      - id: AC-084
+        given: sdd init com preset padrao ou completo
+        when: o projeto é criado
+        then: as camadas do preset ficam ligadas em arquivos, config, CI e AGENTS.md, e o projeto valida
+      - id: AC-085
+        given: um projeto existente
+        when: sdd enable liga camadas
+        then: arquivos, config e seções do AGENTS.md são acrescentados uma única vez; camada inexistente é erro
+        forbidden: [sobrescrever arquivo existente, duplicar chave ou seção ao repetir o comando]
+      - id: AC-086
+        given: arquivos já existentes
+        when: sdd init roda
+        then: nenhum arquivo existente é alterado
+
 design:
   numbers:
     - id: NFR-001

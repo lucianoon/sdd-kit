@@ -12,7 +12,7 @@ runner = CliRunner()
 
 
 def init(root: Path) -> Path:
-    assert runner.invoke(app, ["init", "-C", str(root)]).exit_code == 0
+    assert runner.invoke(app, ["init", "--preset", "padrao", "-C", str(root)]).exit_code == 0
     return root
 
 

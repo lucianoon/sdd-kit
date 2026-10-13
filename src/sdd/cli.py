@@ -7,38 +7,89 @@ import typer
 
 from . import core
 from .models import Spec
-from .scaffold import FILES
 
 app = typer.Typer(add_completion=False, no_args_is_help=True,
                   help="SDD agnóstico: specs como contrato, verificação fora do LLM.")
 Root = typer.Option(Path("."), "--root", "-C", help="Raiz do projeto.")
 
 
+def _err(msg: str) -> None:
+    typer.secho(f"ERRO  {msg}", fg=typer.colors.RED, err=True)
+
+
+def _warn(msg: str) -> None:
+    typer.secho(f"AVISO {msg}", fg=typer.colors.YELLOW)
+
+
+def _verdict(ok: bool, tail: str) -> None:
+    """Linha final de um comando. Cores só em terminal; no CI a saída sai limpa."""
+    typer.echo("")
+    typer.secho("APROVADO" if ok else "REPROVADO", fg=typer.colors.GREEN if ok else typer.colors.RED,
+                bold=True, nl=False)
+    typer.echo(f" — {tail}" if tail else "")
+
+
+VERDICT_COLORS = {"OK": typer.colors.GREEN, "killed": typer.colors.GREEN, "timeout": typer.colors.GREEN,
+                  "survived": typer.colors.RED}
+
+
+def _row(status: str, rest: str, width: int = 10) -> None:
+    color = VERDICT_COLORS.get(status, typer.colors.RED if status.isupper() else None)
+    typer.secho(f"{status:<{width}}", fg=color, nl=False)
+    typer.echo(f" {rest}")
+
+
+def _version(value: bool):
+    if value:
+        from . import __version__
+        typer.echo(f"sdd-kit {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(version: bool = typer.Option(False, "--version", callback=_version, is_eager=True,
+                                      help="Mostra a versão e sai.")):
+    """SDD agnóstico: specs como contrato, verificação fora do LLM."""
+
+
 @app.command()
 def init(
     root: Path = Root,
-    profile: str = typer.Option(None, "--profile", "-p",
-                                help="Perfil de requisitos de referência (disponível: agentes)."),
+    preset: str = typer.Option("minimo", "--preset", help="minimo | padrao | completo"),
+    profile: str = typer.Option(None, "--profile", "-p", help="Perfil de requisitos (disponível: agentes)."),
 ):
-    """Cria a estrutura specs/, AGENTS.md e o workflow de CI (não sobrescreve)."""
-    files = dict(FILES)
-    if profile is not None:
-        from .profile import AGENTS_PATH, skeleton
-        from .scaffold import AGENTS_PROFILE_SECTION
+    """Cria a estrutura mínima (ou a de um preset). Nunca sobrescreve arquivos existentes.
 
-        if profile != "agentes":
-            typer.echo(f"ERRO  perfil '{profile}' não existe (disponível: agentes)", err=True)
+    minimo: spec, check e diff. padrao: + design, tarefas, constituição, arquitetura e
+    decisões. completo: + evals, mutação e critério estrito. Mais tarde: `sdd enable`.
+    """
+    from .layers import init as do_init
+
+    try:
+        actions = do_init(root, preset, profile)
+    except ValueError as exc:
+        _err(str(exc))
+        raise typer.Exit(2)
+    for a in actions:
+        typer.echo(a)
+    typer.echo("\nPróximo passo: `sdd specify <nome>` e depois `sdd validate`.")
+
+
+@app.command()
+def enable(
+    layers: list[str] = typer.Argument(..., help="design tasks constitution arch decisions evals mutate strict agentes"),
+    root: Path = Root,
+):
+    """Liga camadas num projeto existente: cria arquivos, ajusta a config e o AGENTS.md."""
+    from .layers import apply_layer
+
+    for layer in layers:
+        try:
+            for a in apply_layer(root, layer):
+                typer.echo(a)
+        except ValueError as exc:
+            _err(str(exc))
             raise typer.Exit(2)
-        files[AGENTS_PATH] = skeleton(profile)
-        files["AGENTS.md"] = files["AGENTS.md"] + AGENTS_PROFILE_SECTION
-    for rel, content in files.items():
-        p = root / rel
-        if p.exists():
-            typer.echo(f"mantido  {rel}")
-            continue
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(content, encoding="utf-8")
-        typer.echo(f"criado   {rel}")
 
 
 @app.command()
@@ -58,7 +109,7 @@ def specify(
     try:
         path, ids = create(root, name, size, acs)
     except SpecifyError as exc:
-        typer.echo(f"ERRO  {exc}", err=True)
+        _err(exc)
         raise typer.Exit(2)
     typer.echo(f"criado   {path.relative_to(root).as_posix()}")
     typer.echo("IDs      " + "  ".join(f"{k}: {v}" for k, v in ids.items()))
@@ -68,10 +119,10 @@ def specify(
 def _load_or_exit(root: Path) -> core.Project:
     proj = core.load(root)
     for w in proj.warnings:
-        typer.echo(f"AVISO {w}")
+        _warn(w)
     if proj.errors:
         for e in proj.errors:
-            typer.echo(f"ERRO  {e}", err=True)
+            _err(e)
         raise typer.Exit(1)
     return proj
 
@@ -94,12 +145,12 @@ def check(root: Path = Root):
     report = core.check(proj)
     md = core.write_report(proj, report)
     for r in report["criteria"]:
-        typer.echo(f"{r['verdict']:<10} {r['id']:<8} {r['feature']}: {r['text']}")
+        _row(r["verdict"], f"{r['id']:<8} {r['feature']}: {r['text']}")
     for g in report["gates"]:
-        typer.echo(f"{'OK' if g['ok'] else 'FALHOU':<10} gate {g['gate']}")
+        _row("OK" if g["ok"] else "FALHOU", f"gate {g['gate']}")
     for p in report["problems"]:
-        typer.echo(f"ERRO  {p}", err=True)
-    typer.echo(f"\n{'APROVADO' if report['ok'] else 'REPROVADO'} — relatório em {md}")
+        _err(p)
+    _verdict(report["ok"], f"relatório em {md}")
     raise typer.Exit(0 if report["ok"] else 1)
 
 
@@ -119,15 +170,14 @@ def diff(
     try:
         changed, messages = changes(root, base)
     except GitError as exc:
-        typer.echo(f"ERRO  {exc}", err=True)
+        _err(exc)
         raise typer.Exit(2)
     res = evaluate(proj, changed, messages)
     for w in res.warnings:
-        typer.echo(f"AVISO {w}")
+        _warn(w)
     for v in res.violations:
-        typer.echo(f"ERRO  {v}", err=True)
-    typer.echo(f"\n{len(changed)} arquivo(s) alterado(s) desde {base} — "
-               f"{'APROVADO' if res.ok else 'REPROVADO'}")
+        _err(v)
+    _verdict(res.ok, f"{len(changed)} arquivo(s) alterado(s) desde {base}")
     raise typer.Exit(0 if res.ok else 1)
 
 
@@ -151,11 +201,11 @@ def mutate(
         try:
             only = set(changes(root, base)[0])
         except GitError as exc:
-            typer.echo(f"ERRO  {exc}", err=True)
+            _err(exc)
             raise typer.Exit(2)
     specs = [s for s in proj.specs.values() if s.paths and (feature is None or s.feature == feature)]
     if not specs:
-        typer.echo("ERRO  nenhuma feature com `paths` para mutar", err=True)
+        _err("nenhuma feature com `paths` para mutar")
         raise typer.Exit(2)
 
     reports = []
@@ -163,14 +213,14 @@ def mutate(
         typer.echo(f"\n== {spec.feature}")
         rep = mutation.run_feature(
             proj, spec, only, max_mutants,
-            on_result=lambda m: typer.echo(f"  {m.status:<9} {m.where:<28} {m.operator}"))
+            on_result=lambda m: _row(m.status, f"{m.where:<28} {m.operator}", 9))
         reports.append(rep)
         if rep.error:
-            typer.echo(f"  ERRO  {rep.error}", err=True)
+            _err(rep.error)
         elif rep.mutants:
             if rep.killed == 0:
-                typer.echo("  AVISO nenhum mutante morreu: os testes estão rodando contra a cópia? "
-                           "(pacote editável → mutation.env PYTHONPATH: \"{root}/src\")")
+                _warn("nenhum mutante morreu: os testes estão rodando contra a cópia? "
+                      "(pacote editável → mutation.env PYTHONPATH: \"{root}/src\")")
             typer.echo(f"  score {rep.score:.0%} (mínimo {rep.min_score:.0%})")
         else:
             typer.echo("  nada para mutar")
@@ -187,7 +237,7 @@ def mutate(
     if any(r.error for r in reports):
         raise typer.Exit(2)
     ok = all(r.ok for r in reports)
-    typer.echo(f"\n{'APROVADO' if ok else 'REPROVADO'} — relatório em {d / 'mutation.md'}")
+    _verdict(ok, f"relatório em {d / 'mutation.md'}")
     raise typer.Exit(0 if ok else 1)
 
 
@@ -210,9 +260,9 @@ def profile_cmd(
         raise typer.Exit(0)
     proj = core.load(root)
     if proj.agents is None:
-        typer.echo(f"ERRO  {AGENTS_PATH} ausente ou inválido (crie com `sdd init --profile agentes`)", err=True)
+        _err(f"{AGENTS_PATH} ausente ou inválido (crie com `sdd enable agentes`)")
         for e in proj.errors:
-            typer.echo(f"ERRO  {e}", err=True)
+            _err(e)
         raise typer.Exit(2)
     typer.echo(f"estágio: {proj.agents.stage}")
     for r in matrix(proj, proj.agents, {}):
@@ -221,9 +271,9 @@ def profile_cmd(
         state = "DECLARADO" if r["state"] == "COBERTO" else r["state"]
         typer.echo(f"  {r['id']}{star} {state:<14} {r['title']}" + (f"  [{ev}]" if ev else ""))
     for w in proj.warnings:
-        typer.echo(f"AVISO {w}")
+        _warn(w)
     for e in proj.errors:
-        typer.echo(f"ERRO  {e}", err=True)
+        _err(e)
     raise typer.Exit(1 if proj.errors else 0)
 
 
@@ -241,11 +291,10 @@ def arch_cmd(root: Path = Root):
         typer.echo(f"EXCEÇÃO {e['rule']}  {e['file']}:{e['line']}  {e['import']}  ({e['reason']})")
     for v in rep["violations"]:
         extra = f"  [{v['detail']}]" if v.get("detail") else ""
-        typer.echo(f"ERRO  {v['rule']}  {v['file']}:{v['line']}  importa '{v['import']}'{extra}", err=True)
+        _err(f"{v['rule']}  {v['file']}:{v['line']}  importa '{v['import']}'{extra}")
     for p in rep["problems"]:
-        typer.echo(f"ERRO  {p}", err=True)
-    typer.echo(f"\n{len(rep['rules'])} regra(s), {rep['files']} arquivo(s) — "
-               f"{'APROVADO' if rep['ok'] else 'REPROVADO'}")
+        _err(p)
+    _verdict(rep["ok"], f"{len(rep['rules'])} regra(s), {rep['files']} arquivo(s)")
     raise typer.Exit(0 if rep["ok"] else 1)
 
 
@@ -269,11 +318,11 @@ def eval_cmd(root: Path = Root):
     for r in report["evals"]:
         val = f"{r['value']:.3f}" if "value" in r else "—"
         tag = " [juiz LLM]" if r["judge"] == "llm" else ""
-        typer.echo(f"{r['verdict']:<15} {r['id']:<9} {r['metric']} = {val}{tag}"
-                   + (f"  ({r['detail']})" if r["detail"] else ""))
+        _row(r["verdict"], f"{r['id']:<9} {r['metric']} = {val}{tag}"
+             + (f"  ({r['detail']})" if r["detail"] else ""), 15)
     for p in report["problems"]:
-        typer.echo(f"ERRO  {p}", err=True)
-    typer.echo(f"\n{'APROVADO' if report['ok'] else 'REPROVADO'} — relatório em {d / 'eval.md'}")
+        _err(p)
+    _verdict(report["ok"], f"relatório em {d / 'eval.md'}")
     raise typer.Exit(0 if report["ok"] else 1)
 
 
