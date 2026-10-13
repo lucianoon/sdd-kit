@@ -22,7 +22,8 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-python@v6
         with: { python-version: "${{ matrix.python }}" }
-      - run: pip install -e ".[dev]"
+      # O plugin transforma cada teste que falha em anotação no PR/commit.
+      - run: pip install -e ".[dev]" pytest-github-actions-annotate-failures
       # Codificação implícita vira erro: pega no Linux os bugs que só apareceriam no Windows.
       - run: python -W error::EncodingWarning -m pytest -q
         env: { PYTHONWARNDEFAULTENCODING: "1" }
