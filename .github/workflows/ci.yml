@@ -1,0 +1,45 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python: "3.12"
+          - os: macos-latest
+            python: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ matrix.python }}" }
+      - run: pip install -e ".[dev]"
+      - run: python -m pytest -q
+
+  # O kit verifica a si mesmo com as próprias regras.
+  sdd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ".[dev]"
+      - run: sdd validate
+      - if: github.event_name == 'pull_request'
+        run: sdd diff --base "origin/${{ github.base_ref }}"
+      - run: sdd check
+      - if: github.event_name == 'pull_request'
+        run: sdd mutate --base "origin/${{ github.base_ref }}"
+      - if: always()
+        shell: bash
+        run: cat .sdd/report.md .sdd/mutation.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true

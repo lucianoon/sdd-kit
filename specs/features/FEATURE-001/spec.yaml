@@ -1,0 +1,294 @@
+feature: motor-de-verificacao
+version: 1
+size: complex
+summary: O próprio sdd-kit, especificado e verificado por ele mesmo.
+assumptions:
+  - assumption: linguagens alvo da mutação não foram fixadas
+    chosen: operadores textuais comuns a Python e linguagens com sintaxe C
+    rationale: cobre a maioria das stacks sem depender de parser por linguagem
+open_questions: []
+decisions: [AD-001, AD-002, AD-003, AD-004]
+out_of_scope:
+  - Detecção de divergência entre prosa em Markdown e código
+  - Adaptadores específicos por ferramenta (AGENTS.md cobre o MVP)
+requirements:
+  - id: REQ-001
+    description: Validar especificações antes de qualquer verificação.
+    acceptance:
+      - id: AC-001
+        given: um projeto com spec e config válidas
+        when: as specs são carregadas
+        then: nenhum erro é reportado
+      - id: AC-002
+        given: duas specs que usam o mesmo ID
+        when: as specs são carregadas
+        then: o ID duplicado é reportado como erro
+      - id: AC-003
+        given: uma spec que referencia um gate não definido na config
+        when: as specs são carregadas
+        then: o gate indefinido é reportado como erro
+  - id: REQ-002
+    description: Ligar cada critério de aceitação a evidência de teste real.
+    acceptance:
+      - id: AC-004
+        given: um critério sem teste com seu ID no nome
+        when: o check roda
+        then: o check falha e aponta o critério como SEM_TESTE
+      - id: AC-005
+        given: um critério cujo teste falha
+        when: o check roda
+        then: o check falha e aponta o critério como FALHOU
+      - id: AC-006
+        given: todos os critérios com teste passando
+        when: o check roda
+        then: o check aprova e grava o relatório
+      - id: AC-007
+        given: um teste que cita um ID inexistente nas specs
+        when: o check roda
+        then: o check falha apontando o ID órfão
+      - id: AC-021
+        given: um JUnit aprovado de execução anterior e um comando de testes que não gera JUnit novo
+        when: o check roda
+        then: o check falha em vez de reaproveitar a evidência antiga
+  - id: REQ-003
+    description: Executar os quality gates declarados pelas specs.
+    acceptance:
+      - id: AC-008
+        given: um gate cujo comando retorna código diferente de zero
+        when: o check roda
+        then: o check falha mesmo com todos os testes passando
+  - id: REQ-004
+    description: Inicializar um projeto pronto para uso.
+    acceptance:
+      - id: AC-009
+        given: um diretório vazio
+        when: sdd init roda
+        then: o projeto gerado passa em sdd validate
+  - id: REQ-005
+    description: Impedir que código e spec divirjam ao longo das mudanças.
+    acceptance:
+      - id: AC-010
+        given: um arquivo em paths de uma feature alterado sem mudança na pasta da spec
+        when: sdd diff roda
+        then: o diff reprova apontando a feature
+      - id: AC-011
+        given: código e spec da mesma feature alterados juntos
+        when: sdd diff roda
+        then: o diff aprova
+      - id: AC-012
+        given: um arquivo de código alterado que nenhuma feature declara em paths
+        when: sdd diff roda
+        then: o diff reprova apontando o arquivo sem dono
+      - id: AC-013
+        given: um commit no intervalo com o trailer SDD-No-Spec-Change e um motivo
+        when: sdd diff roda
+        then: o diff aprova e registra o motivo como aviso
+      - id: AC-014
+        given: apenas a spec alterada, sem código
+        when: sdd diff roda
+        then: o diff aprova com aviso
+      - id: AC-015
+        given: alterações não commitadas e arquivos não rastreados
+        when: sdd diff roda
+        then: essas alterações entram na avaliação
+  - id: REQ-006
+    description: Exigir desenho arquitetural explícito e verificável antes da implementação.
+    acceptance:
+      - id: AC-016
+        given: require_design ativo e uma spec sem seção design
+        when: as specs são carregadas
+        then: a ausência do design é reportada como erro
+      - id: AC-017
+        given: um design com menos de duas alternativas ou sem exatamente uma escolhida
+        when: as specs são carregadas
+        then: o problema nas alternativas é reportado como erro
+      - id: AC-018
+        given: um risco sem mitigação nem aceite, ou mitigado por um ID inexistente na spec
+        when: as specs são carregadas
+        then: o risco sem tratamento válido é reportado como erro
+      - id: AC-019
+        given: um número sem limite, sem unidade ou sem fonte
+        when: as specs são carregadas
+        then: o número incompleto é reportado como erro
+      - id: AC-020
+        given: um número com id NFR
+        when: o check roda
+        then: o NFR exige teste com seu ID igual a um critério de aceitação
+  - id: REQ-007
+    description: Exigir rigor proporcional ao tamanho da feature.
+    acceptance:
+      - id: AC-022
+        given: require_design ativo
+        when: as specs são carregadas
+        then: design é exigido só para os sizes configurados, e size ausente conta como large
+      - id: AC-023
+        given: uma feature small que altera mais arquivos de código que small_max_files
+        when: sdd diff roda
+        then: o diff reprova pedindo reclassificação ou divisão
+  - id: REQ-008
+    description: Não deixar ambiguidade passar em silêncio (closure gate).
+    acceptance:
+      - id: AC-024
+        given: uma pergunta aberta sem resposta na spec
+        when: as specs são carregadas
+        then: a pergunta é reportada como erro até ser respondida
+      - id: AC-025
+        given: uma premissa sem padrão escolhido ou sem justificativa
+        when: as specs são carregadas
+        then: a premissa incompleta é reportada como erro
+  - id: REQ-009
+    description: Manter um registro de decisões do projeto referenciável pelas specs.
+    acceptance:
+      - id: AC-026
+        given: uma spec que referencia uma decisão inexistente
+        when: as specs são carregadas
+        then: a referência é reportada como erro
+      - id: AC-027
+        given: uma spec que referencia uma decisão substituída
+        when: as specs são carregadas
+        then: o erro aponta a decisão substituta
+      - id: AC-028
+        given: uma decisão substituída sem substituta válida
+        when: as specs são carregadas
+        then: a decisão é reportada como erro
+  - id: REQ-010
+    description: Medir se os testes detectam código errado, sem LLM.
+    acceptance:
+      - id: AC-029
+        given: testes que verificam os resultados
+        when: sdd mutate roda
+        then: todos os mutantes morrem e o mutate aprova
+      - id: AC-030
+        given: testes que só executam o código sem verificar
+        when: sdd mutate roda
+        then: o mutate reprova listando cada sobrevivente com arquivo e linha
+      - id: AC-031
+        given: qualquer execução do mutate
+        when: ela termina
+        then: o diretório de trabalho fica idêntico ao de antes
+      - id: AC-032
+        given: uma suíte que já falha sem mutações
+        when: sdd mutate roda
+        then: o mutate sai com erro em vez de medir
+      - id: AC-033
+        given: operadores dentro de strings, comentários ou linhas com sdd no-mutate
+        when: os candidatos são gerados
+        then: esses trechos não são mutados
+  - id: REQ-011
+    description: Verificar comportamento não determinístico (LLM) com critérios estatísticos.
+    acceptance:
+      - id: AC-034
+        given: resultados brutos com média acima do limite em todas as execuções exigidas
+        when: sdd eval roda
+        then: o eval aprova e o relatório mostra valor, intervalo e variação
+      - id: AC-035
+        given: uma média fora do limite mínimo ou máximo
+        when: sdd eval roda
+        then: o eval reprova como FORA_DO_LIMITE
+      - id: AC-036
+        given: execuções ou casos insuficientes, caso fora do dataset ou caso duplicado
+        when: sdd eval roda
+        then: o eval reprova como INCOMPLETO apontando o motivo
+      - id: AC-037
+        given: variação entre execuções acima de max_run_spread
+        when: sdd eval roda
+        then: o eval reprova como INSTAVEL
+      - id: AC-038
+        given: uma eval com judge llm
+        when: as specs são carregadas e o eval roda
+        then: ela só é aceita se a política permitir, e o relatório a marca como probabilística
+      - id: AC-039
+        given: resultados de uma execução anterior e um harness que não grava nada
+        when: sdd eval roda
+        then: o eval reprova como SEM_RESULTADO em vez de reaproveitar
+      - id: AC-040
+        given: use_lower_bound ativo e uma média acima do limite com amostra pequena
+        when: sdd eval roda
+        then: o limite inferior do IC 95% é comparado e o eval reprova
+      - id: AC-041
+        given: um dataset de eval alterado sem mudança na spec
+        when: sdd diff roda
+        then: o diff reprova
+      - id: AC-042
+        given: um dataset com menos casos que min_cases
+        when: as specs são carregadas
+        then: o tamanho insuficiente é reportado como erro
+
+design:
+  numbers:
+    - id: NFR-001
+      metric: tempo de sdd validate com 200 specs
+      max: 2
+      unit: s
+      at: máquina de CI padrão
+      source: meta do autor para monorepos grandes
+    - metric: specs por projeto
+      max: 500
+      unit: arquivos
+      source: estimativa do autor
+  data_flow:
+    ingress:
+      - via: arquivo
+        source: specs YAML versionadas no repositório
+        frequency: a cada execução local ou de CI
+      - via: arquivo
+        source: JUnit XML gerado pelo runner de testes do projeto
+        frequency: a cada sdd check
+    egress:
+      - to: arquivo (.sdd/report.md e .sdd/report.json)
+        consumers: [revisor do PR, resumo do GitHub Actions, outras ferramentas]
+        freshness: imediata
+  alternatives:
+    - name: rastreio pelo nome do teste lido do JUnit XML
+      chosen: true
+      why: funciona com qualquer linguagem e runner que gere JUnit, sem plugin
+    - name: marcadores/decorators do runner (ex. pytest.mark.ac)
+      why_not: exige um plugin por linguagem e quebra o agnosticismo
+    - name: LLM avaliando se os testes cobrem a spec
+      why_not: viola a invariante de que nenhuma aprovação depende de LLM
+  risks:
+    - area: data_integrity
+      severity: high
+      description: teste com o ID certo no nome mas que não verifica o comportamento
+      mitigated_by: [AC-029, AC-030]
+    - area: data_integrity
+      severity: medium
+      description: mutação textual gera mutantes equivalentes que sobrevivem sem culpa dos testes
+      accepted: marcação sdd no-mutate e min_score abaixo de 100% absorvem o ruído
+    - area: data_integrity
+      severity: high
+      description: mutate corromper o código do usuário
+      mitigated_by: [AC-031]
+    - area: data_integrity
+      severity: high
+      description: harness de eval declarar uma nota melhor que a real
+      mitigated_by: [AC-034, AC-036, AC-039]
+    - area: data_integrity
+      severity: high
+      description: afrouxar um eval trocando o dataset em silêncio
+      mitigated_by: [AC-041]
+    - area: data_integrity
+      severity: medium
+      description: aprovar por sorte com amostra pequena de um comportamento variável
+      mitigated_by: [AC-037, AC-040]
+    - area: data_integrity
+      severity: high
+      description: aprovar com JUnit velho de uma execução anterior
+      mitigated_by: [AC-021]
+    - area: security
+      severity: medium
+      description: gates e comando de testes rodam via shell a partir da config
+      accepted: a config é código do repositório e passa por revisão no PR como qualquer script
+    - area: performance
+      severity: low
+      description: validação lenta em monorepos com muitas specs
+      mitigated_by: [NFR-001]
+
+invariants:
+  - Nenhuma decisão de aprovação depende de um LLM
+  - Evidência de execução anterior nunca é reaproveitada
+  - Toda exceção à regra de diff fica registrada no histórico do git
+quality_gates:
+  - compila
+paths:
+  - src/sdd/**

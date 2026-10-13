@@ -1,0 +1,15 @@
+version: 1
+tests:
+  command: "python -m pytest -q --junitxml=.sdd/junit.xml"
+  junit: ".sdd/junit.xml"
+gates:
+  compila: "python -m compileall -q src"
+code:
+  - src/**
+require_design: true
+mutation:
+  command: "python -m pytest -q -x -p no:cacheprovider -k 'not nfr_001'"
+  env:
+    PYTHONPATH: "{root}/src"   # o kit está instalado em modo editável
+  min_score: 0.9
+  max_mutants: 25

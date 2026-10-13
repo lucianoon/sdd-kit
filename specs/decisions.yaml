@@ -1,0 +1,23 @@
+decisions:
+  - id: AD-001
+    title: Nenhuma aprovação depende de LLM
+    decision: Todo veredito do sdd vem de execução determinística (testes, gates, git, mutação).
+    rationale: Um LLM pode ser útil como revisor, mas aprovar exige reprodutibilidade.
+  - id: AD-002
+    title: Evidência de teste vem do JUnit XML
+    decision: O rastreio lê resultados reais em JUnit XML, ligados por ID no nome do teste.
+    rationale: Formato suportado por praticamente todo runner; dispensa plugin por linguagem.
+  - id: AD-004
+    title: Juiz LLM só em evals marcadas, por política explícita
+    decision: >-
+      Evals podem usar judge: llm apenas se o projeto declarar evals.allow_llm_judge: true.
+      ACs e NFRs nunca usam juiz LLM. O sdd agrega sempre de forma determinística e o
+      relatório marca esses evals como probabilísticos.
+    rationale: >-
+      Algumas qualidades de LLM só são medíveis por outro modelo. Proibir deixaria a camada
+      de comportamento sem gate; permitir em silêncio violaria a AD-001. A marcação torna a
+      exceção visível e auditável.
+  - id: AD-003
+    title: Mutação textual por operadores
+    decision: sdd mutate troca operadores no texto, numa cópia isolada, e lê só o exit code.
+    rationale: Agnóstico de linguagem; ferramentas dedicadas (mutmut, Stryker) seguem usáveis como gates.

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sdd-kit"
+version = "0.5.0"
+description = "SDD agnóstico: especificações como contrato, verificação fora do LLM."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Luciano Oliveira Nunes" }]
+keywords = ["sdd", "spec-driven-development", "ai-agents", "llm", "evals", "mutation-testing"]
+dependencies = ["typer>=0.12", "pydantic>=2.6", "pyyaml>=6"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+sdd = "sdd.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sdd"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
