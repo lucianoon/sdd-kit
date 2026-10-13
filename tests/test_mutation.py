@@ -228,3 +228,8 @@ def test_pasta_com_nome_de_codigo_nao_quebra(tmp_path):
     r = mutate(tmp_path)
     assert r.exit_code == 0, r.output
     assert "LEIAME" not in r.output
+
+
+def test_ac_033_cerquilha_dentro_de_string_nao_vira_comentario(tmp_path):
+    (tmp_path / "a.py").write_text(encoding="utf-8", data='url = "/doc#secao" + sufixo  # a > b\n')
+    assert [(m.line, m.col, m.operator) for m in candidates(tmp_path, ["a.py"])] == [(1, 20, "+→-")]

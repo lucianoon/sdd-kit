@@ -70,3 +70,13 @@ def test_risco_mitigado_por_regra_arch_mostra_estado():
                                                           "violations": [{"rule": "ARCH-001", "file": "a.py",
                                                                           "line": 1, "import": "x"}]}})
     assert "ARCH-001 (VIOLADA)" in bad
+
+
+def test_junit_em_pastas_aninhadas_inexistentes(tmp_path):
+    # ex.: Gradle/Maven gravam em build/test-results/...; as pastas ainda não existem
+    make(tmp_path, "def test_ac_001_x(): pass\n")
+    cfg = tmp_path / "specs/sdd.yaml"
+    cfg.write_text(encoding="utf-8", data=cfg.read_text(encoding="utf-8").replace(
+        ".sdd/junit.xml", "build/test-results/junit.xml"))
+    report = core.check(core.load(tmp_path))
+    assert report["ok"], report["problems"]
