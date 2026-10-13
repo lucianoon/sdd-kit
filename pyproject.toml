@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Luciano Oliveira Nunes" }]
 keywords = ["sdd", "spec-driven-development", "ai-agents", "llm", "evals", "mutation-testing"]
-dependencies = ["typer>=0.12", "pydantic>=2.6", "pyyaml>=6"]
+dependencies = ["typer>=0.27.3", "pydantic>=2.6", "pyyaml>=6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
