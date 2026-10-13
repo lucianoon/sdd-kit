@@ -61,7 +61,21 @@ def test_ac_001_pedido_persistido(): ...
 it("AC-001 persiste o pedido", ...)
 ```
 
-Vale `AC-001`, `ac_001`, `AC_001`. Um teste pode cobrir vários ACs; um AC pode ter vários testes.
+```go
+func TestAC_001_PersistePedido(t *testing.T) { ... }   // ou TestAC001..., ou t.Run("AC-001 ...")
+```
+
+Convenções reconhecidas, verificadas no CI com os runners reais (pasta `examples/`):
+
+| Stack | Exemplos de nome | JUnit gerado por |
+|---|---|---|
+| pytest | `test_ac_001_x`, `test_nfr_001_p95` | `--junitxml` |
+| jest / vitest | `it("AC-001 ...")`, `describe("AC-003 ...")` cobre o bloco, `test.each` | jest-junit / reporter `junit` |
+| Go | `TestAC_001_X`, `TestAC001X`, subteste `t.Run("AC-003 ...")` | go-junit-report ou gotestsum |
+| JUnit / xUnit | `testAC001`, `shouldPersist_AC_001`, `AC001_Cria` | nativo |
+
+Um teste pode cobrir vários ACs; um AC pode ter vários testes. Palavras que só parecem IDs
+(`MAC-001`, `HVAC100`, `track_001`) não contam.
 
 **3. Config** — `specs/sdd.yaml` é o único lugar que conhece a stack:
 

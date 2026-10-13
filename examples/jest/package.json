@@ -1,0 +1,7 @@
+{
+  "name": "sdd-exemplo-jest",
+  "private": true,
+  "scripts": { "test": "jest" },
+  "devDependencies": { "jest": "29.7.0", "jest-junit": "16.0.0" },
+  "jest-junit": { "outputDirectory": ".sdd", "outputName": "junit.xml" }
+}

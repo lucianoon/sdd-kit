@@ -1,0 +1,5 @@
+tests:
+  # jest-junit grava o JUnit (configurado no package.json). O ID pode estar no it(), no
+  # describe() (cobre o bloco todo) ou no título de um test.each.
+  command: "npx jest --ci --reporters=default --reporters=jest-junit"
+  junit: .sdd/junit.xml

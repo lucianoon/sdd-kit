@@ -46,6 +46,10 @@ requirements:
         given: um teste que cita um ID inexistente nas specs
         when: o check roda
         then: o check falha apontando o ID órfão
+      - id: AC-060
+        given: nomes de teste nas convenções de pytest, jest, vitest, Go e JUnit
+        when: o JUnit é lido
+        then: os IDs são reconhecidos, sem falso positivo em palavras como MAC-001 ou HVAC100
       - id: AC-021
         given: um JUnit aprovado de execução anterior e um comando de testes que não gera JUnit novo
         when: o check roda

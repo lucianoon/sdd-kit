@@ -16,7 +16,13 @@ CONFIG_PATH = "specs/sdd.yaml"
 DECISIONS_PATH = "specs/decisions.yaml"
 ARCH_PATH = "specs/architecture.yaml"
 FEATURES_GLOB = "specs/features/*/spec.yaml"
-ID_IN_TEST = re.compile(r"(?<![A-Za-z])(AC|NFR)[-_](\d{3,})", re.IGNORECASE)
+# ID de critério dentro do nome de um teste. Aceita as convenções reais de cada ecossistema:
+#   test_ac_001_x (pytest) · "AC-001 cria" (jest/vitest) · TestAC_001_X e TestAC001X (Go,
+#   onde o prefixo Test é obrigatório) · testAC001 / shouldX_AC_001 (JUnit) · Sub/AC-003_x.
+# Evita falsos positivos como MAC-001, HVAC100, track_001: antes de "AC" vem um não-letra,
+# ou uma minúscula/dígito seguida de "AC" maiúsculo (fronteira de CamelCase).
+ID_IN_TEST = re.compile(
+    r"(?:(?<![A-Za-z])(?P<a>(?i:ac|nfr))|(?<=[a-z0-9])(?P<b>AC|NFR))[-_]?(?P<n>\d{3,})")
 
 
 @dataclass
@@ -179,7 +185,7 @@ def parse_junit(path: Path) -> dict[str, list[tuple[str, str]]]:
         full = f"{case.get('classname', '')}::{name}"
         tags = {c.tag for c in case}
         status = "failed" if tags & {"failure", "error"} else "skipped" if "skipped" in tags else "passed"
-        for kind, num in {(k.upper(), n) for k, n in ID_IN_TEST.findall(name)}:
+        for kind, num in {((m["a"] or m["b"]).upper(), m["n"]) for m in ID_IN_TEST.finditer(name)}:
             found.setdefault(f"{kind}-{num}", []).append((full, status))
     return found
 

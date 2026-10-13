@@ -1,0 +1,6 @@
+tests:
+  # go test não gera JUnit; o go-junit-report converte (gotestsum --junitfile também serve).
+  # Instale: go install github.com/jstemmer/go-junit-report/v2@v2.1.0
+  # Convenções reconhecidas: TestAC_001_X, TestAC001X e subtestes t.Run("AC-003 ...").
+  command: "mkdir -p .sdd && go test -v ./... 2>&1 | go-junit-report -set-exit-code -out .sdd/junit.xml"
+  junit: .sdd/junit.xml
