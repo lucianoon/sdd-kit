@@ -22,7 +22,9 @@ def alive(pid: int) -> bool:
         with open(f"/proc/{pid}/stat", encoding="utf-8") as f:
             return f.read().split()[2] != "Z"
     except FileNotFoundError:
-        return True
+        return not os.path.isdir(f"/proc/{os.getpid()}")  # sem /proc (macOS): vale o os.kill
+    except ProcessLookupError:
+        return False  # morreu entre o os.kill e a leitura de /proc
 
 
 def test_ac_059_timeout_mata_o_processo_neto(tmp_path):
