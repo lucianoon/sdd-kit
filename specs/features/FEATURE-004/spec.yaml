@@ -1,0 +1,169 @@
+feature: evals
+version: 2
+size: large
+summary: Agregar resultados de comportamento com critérios estatísticos e política explícita para juiz
+  LLM.
+assumptions: []
+open_questions: []
+decisions:
+- AD-005
+- AD-002
+- AD-003
+- AD-004
+out_of_scope:
+- Detecção de divergência entre prosa em Markdown e código
+- Adaptadores específicos por ferramenta (AGENTS.md cobre o MVP)
+requirements:
+- id: REQ-011
+  description: Verificar comportamento não determinístico (LLM) com critérios estatísticos.
+  acceptance:
+  - id: AC-034
+    given: resultados brutos com média acima do limite em todas as execuções exigidas
+    when: sdd eval roda
+    then: o eval aprova e o relatório mostra valor, intervalo e variação
+  - id: AC-035
+    given: uma média fora do limite mínimo ou máximo
+    when: sdd eval roda
+    then: o eval reprova como FORA_DO_LIMITE
+  - id: AC-036
+    given: execuções ou casos insuficientes, caso fora do dataset ou caso duplicado
+    when: sdd eval roda
+    then: o eval reprova como INCOMPLETO apontando o motivo
+  - id: AC-037
+    given: variação entre execuções acima de max_run_spread
+    when: sdd eval roda
+    then: o eval reprova como INSTAVEL
+  - id: AC-038
+    given: uma eval com judge llm
+    when: as specs são carregadas e o eval roda
+    then: ela só é aceita se a política permitir, e o relatório JSON e Markdown marca a evidência de juiz
+      LLM como probabilística
+  - id: AC-039
+    given: resultados de uma execução anterior e um harness que não grava nada
+    when: sdd eval roda
+    then: o eval reprova como SEM_RESULTADO em vez de reaproveitar
+  - id: AC-040
+    given: use_lower_bound ativo e uma média acima do limite com amostra pequena
+    when: sdd eval roda
+    then: o limite inferior do IC 95% é comparado e o eval reprova
+  - id: AC-041
+    given: um dataset de eval alterado sem mudança na spec
+    when: sdd diff roda
+    then: o diff reprova
+  - id: AC-042
+    given: um dataset com menos casos que min_cases
+    when: as specs são carregadas
+    then: o tamanho insuficiente é reportado como erro
+  - id: AC-055
+    given: um harness de eval que excede o timeout
+    when: sdd eval roda
+    then: o eval reprova com código -1 em vez de travar
+- id: REQ-016
+  description: Contrato de ferramenta, evals críticos e efeitos proibidos.
+  acceptance:
+  - id: AC-070
+    given: uma escrita não idempotente
+    when: as specs são carregadas
+    then: sem consulta de status exige reconciliation; com consulta de status o retry é permitido
+  - id: AC-071
+    given: um eval crítico
+    when: um único caso falha em qualquer execução
+    then: o eval reprova como FALHA_CRITICA listando os casos
+  - id: AC-072
+    given: um critério com efeitos proibidos
+    when: o relatório é gerado
+    then: os efeitos proibidos aparecem junto do resultado esperado
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivo ou chamada de biblioteca
+      source: datasets e resultados brutos por caso e execução
+      frequency: a cada execução do comando
+    egress:
+    - to: resultado estruturado e relatório quando aplicável
+      consumers:
+      - CLI
+      - biblioteca
+      - CI
+      freshness: imediata
+  alternatives:
+  - name: agregação determinística de resultados brutos
+    chosen: true
+    why: o harness não determina a própria média
+  - name: aceitar apenas uma nota agregada do harness
+    why_not: oculta duplicatas, amostras insuficientes e falhas críticas
+  risks:
+  - area: data_integrity
+    severity: high
+    description: afrouxar um eval trocando o dataset em silêncio
+    mitigated_by:
+    - AC-041
+  - area: data_integrity
+    severity: medium
+    description: aprovar por sorte com amostra pequena de um comportamento variável
+    mitigated_by:
+    - AC-037
+    - AC-040
+  - area: other
+    severity: medium
+    description: motor acoplado à CLI impede uso como biblioteca e testes isolados
+    mitigated_by:
+    - ARCH-001
+    - ARCH-002
+  - area: data_integrity
+    severity: high
+    description: harness fabricar resultados sem executar o modelo ou usar dataset não representativo
+    accepted: a integridade estrutural não comprova a origem nem a representatividade; revisão humana
+      do harness e dataset é obrigatória
+  dependencies:
+  - name: harness de evals
+    kind: process
+    timeout_ms: 3600000
+    retry:
+      max_attempts: 1
+      backoff: none
+    fallback: 'nenhum: o eval reprova; retry mascararia instabilidade do agente'
+    side_effects: false
+    idempotent: false
+    covered_by:
+    - AC-055
+    - AC-039
+tasks:
+- id: T-11
+  title: Verificar comportamento não determinístico (LLM) com critérios estatísticos.
+  origin:
+  - REQ-011
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-034
+  - AC-035
+  - AC-036
+  - AC-037
+  - AC-038
+  - AC-039
+  - AC-040
+  - AC-041
+  - AC-042
+  - AC-055
+  status: done
+- id: T-16
+  title: Contrato de ferramenta, evals críticos e efeitos proibidos.
+  origin:
+  - REQ-016
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-070
+  - AC-071
+  - AC-072
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+quality_gates:
+- compila
+paths:
+- src/sdd/evals.py

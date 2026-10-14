@@ -159,7 +159,9 @@ def source_files(root: Path) -> list[str]:
 
 
 def check(proj) -> dict:
-    report = {"ok": True, "rules": [r.id for r in proj.arch], "files": 0,
+    from .report import metadata
+
+    report = {**metadata("arch"), "ok": True, "rules": [r.id for r in proj.arch], "files": 0,
               "violations": [], "exceptions": [], "problems": []}
     if not proj.arch:
         return report
@@ -191,3 +193,16 @@ def check(proj) -> dict:
     report["files"] = len(checked)
     report["ok"] = not report["violations"] and not report["problems"]
     return report
+
+
+def render_markdown(report: dict) -> str:
+    from .report import version_line, constitution_section
+
+    out = ["# Relatório de arquitetura SDD", "", version_line(report), "",
+           f"**Resultado: {'APROVADO' if report['ok'] else 'REPROVADO'}**", "",
+           f"{len(report['rules'])} regra(s), {report['files']} arquivo(s) verificado(s)."]
+    out += [f"- {v['rule']}: `{v['file']}:{v['line']}` importa `{v['import']}`" for v in report['violations']]
+    out += [f"- {p}" for p in report['problems']]
+    out += [f"- Exceção {e['rule']}: `{e['file']}:{e['line']}` — {e['reason']}" for e in report['exceptions']]
+    out += constitution_section(report.get("constitution"))
+    return "\n".join(out) + "\n"

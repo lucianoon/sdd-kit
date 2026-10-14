@@ -31,7 +31,7 @@ def test_ac_059_timeout_mata_o_processo_neto(tmp_path):
     pid_file = tmp_path / "pid"
     # "&& echo fim" impede o shell de se substituir pelo python: o python vira neto.
     cmd = (f"{PY} -c \"import os, time, pathlib; "
-           f"pathlib.Path(r'{pid_file}').write_text(str(os.getpid())); time.sleep(60)\" && echo fim")
+           f"pathlib.Path(r'{pid_file}').write_text(str(os.getpid()), encoding='utf-8'); time.sleep(60)\" && echo fim")
     start = time.monotonic()
     r = run_shell(cmd, tmp_path, timeout=2)
     assert r.timed_out and r.returncode == -1

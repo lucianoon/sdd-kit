@@ -127,6 +127,17 @@ def _load_or_exit(root: Path) -> core.Project:
     return proj
 
 
+def _constitution(proj, command: str, ok: bool, verdicts=None, complete: bool = True):
+    from .analysis import constitution_matrix, kit_context
+
+    if proj.constitution is None:
+        return None
+    states = kit_context(proj, {})
+    if states[command] != "NÃO_APLICÁVEL" or not ok:
+        states[command] = "FALHOU" if not ok else ("OK" if complete else "PENDENTE")
+    return constitution_matrix(proj.constitution, verdicts or {}, {}, {}, states)
+
+
 @app.command()
 def validate(root: Path = Root):
     """Valida schema, unicidade de IDs e gates referenciados."""
@@ -162,9 +173,10 @@ def diff(
     """Reprova quando código de uma feature muda sem a spec mudar junto.
 
     Refatoração sem mudança de comportamento: adicione ao commit o trailer
-    `SDD-No-Spec-Change: <motivo>`. Fica registrado no histórico do git.
+    `SDD-No-Spec-Change(feature): <motivo>`. Fica registrado no histórico do git.
     """
-    from .diff import GitError, changes, evaluate
+    from .diff import GitError, changes, evaluate, report as diff_report, render_markdown
+    from .report import write_command_report
 
     proj = _load_or_exit(root)
     try:
@@ -173,6 +185,8 @@ def diff(
         _err(exc)
         raise typer.Exit(2)
     res = evaluate(proj, changed, messages, merge_base)
+    rep = diff_report(res, base, _constitution(proj, "diff", res.ok))
+    write_command_report(root, "diff", rep, render_markdown(rep))
     for w in res.warnings:
         _warn(w)
     for v in res.violations:
@@ -193,6 +207,7 @@ def mutate(
     Roda numa cópia isolada; o diretório de trabalho nunca é alterado.
     """
     from . import mutation
+    from .report import metadata, write_command_report
 
     proj = _load_or_exit(root)
     only = None
@@ -225,19 +240,22 @@ def mutate(
         else:
             typer.echo("  nada para mutar")
 
-    d = root / ".sdd"
-    d.mkdir(exist_ok=True)
-    (d / "mutation.md").write_text(mutation.render_markdown(reports), encoding="utf-8")
-    (d / "mutation.json").write_text(json.dumps([
-        {"feature": r.feature, "score": r.score, "min_score": r.min_score, "ok": r.ok,
+    ok = all(r.ok for r in reports)
+    complete = feature is None and base is None and all(r.mutants for r in reports)
+    const = _constitution(proj, "mutate", ok, complete=complete)
+    scope = {"features": [r.feature for r in reports], "base": base,
+             "max_mutants": max_mutants or proj.config.mutation.max_mutants}
+    data = [
+        {**metadata("mutate"), "scope": scope, "constitution": const,
+         "feature": r.feature, "verdict": r.verdict, "score": r.score, "min_score": r.min_score, "ok": r.ok,
          "error": r.error, "candidates": r.candidates,
          "mutants": [vars(m) for m in r.mutants]} for r in reports
-    ], indent=2, ensure_ascii=False), encoding="utf-8")
+    ]
+    md = write_command_report(root, "mutation", data, mutation.render_markdown(reports, const, scope))
 
     if any(r.error for r in reports):
         raise typer.Exit(2)
-    ok = all(r.ok for r in reports)
-    _verdict(ok, f"relatório em {d / 'mutation.md'}")
+    _verdict(ok, f"relatório em {md}")
     raise typer.Exit(0 if ok else 1)
 
 
@@ -281,9 +299,13 @@ def profile_cmd(
 def arch_cmd(root: Path = Root):
     """Verifica só as regras de arquitetura (specs/architecture.yaml). Rápido, sem testes."""
     from . import arch
+    from .report import write_command_report
 
     proj = _load_or_exit(root)
     rep = arch.check(proj)
+    verdicts = {rid: "OK" if rep["ok"] else "VIOLADA" for rid in rep["rules"]}
+    rep["constitution"] = _constitution(proj, "arch", rep["ok"], verdicts)
+    write_command_report(root, "arch", rep, arch.render_markdown(rep))
     if not rep["rules"]:
         typer.echo("nenhuma regra em specs/architecture.yaml")
         raise typer.Exit(0)
@@ -305,13 +327,13 @@ def eval_cmd(root: Path = Root):
     Separado do `check` porque evals costumam chamar APIs de LLM (custo e tempo).
     """
     from . import evals
+    from .report import write_command_report
 
     proj = _load_or_exit(root)
     report = evals.run(proj)
-    d = root / ".sdd"
-    d.mkdir(exist_ok=True)
-    (d / "eval.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    (d / "eval.md").write_text(evals.render_markdown(report), encoding="utf-8")
+    report["constitution"] = _constitution(proj, "eval", report["ok"],
+                                             {r["id"]: r["verdict"] for r in report["evals"]})
+    md = write_command_report(root, "eval", report, evals.render_markdown(report))
     if not report["evals"] and report["ok"]:
         typer.echo("nenhuma eval declarada nas specs")
         raise typer.Exit(0)
@@ -322,7 +344,7 @@ def eval_cmd(root: Path = Root):
              + (f"  ({r['detail']})" if r["detail"] else ""), 15)
     for p in report["problems"]:
         _err(p)
-    _verdict(report["ok"], f"relatório em {d / 'eval.md'}")
+    _verdict(report["ok"], f"relatório em {md}")
     raise typer.Exit(0 if report["ok"] else 1)
 
 

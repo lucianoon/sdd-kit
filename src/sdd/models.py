@@ -426,6 +426,8 @@ class Config(Strict):
     gates: dict[str, str] = {}
     # O que conta como código de produção. Arquivo aqui sem feature dona reprova o `sdd diff`.
     code: list[str] = []
+    # Migração: o trailer sem feature só é aceito com opt-in e aviso de depreciação.
+    allow_global_diff_override: bool = False
     # Exige a seção `design` nas specs cujo `size` está em `design_required_for`.
     require_design: bool = False
     design_required_for: list[Size] = ["large", "complex"]

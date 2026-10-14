@@ -23,6 +23,6 @@ rules:
     forbid: [subprocess, shutil, typer]
     forbid_paths: [src/sdd/core, src/sdd/diff, src/sdd/arch, src/sdd/evals, src/sdd/mutation]
   - id: ARCH-003
-    description: Nenhuma aprovação depende de LLM (AD-001); o kit não importa SDK de modelo
+    description: O kit agrega evidências sem importar SDK de modelo; juiz LLM fica no harness externo (AD-005)
     from: ["src/sdd/**"]
     forbid: [openai, anthropic, "langchain*", "langgraph*", litellm, google.generativeai, "google.genai", cohere, mistralai, ollama]

@@ -1,0 +1,143 @@
+feature: diff
+version: 2
+size: large
+summary: Cobrar alterações de contrato por feature e exceções auditáveis com alcance explícito.
+assumptions: []
+open_questions: []
+decisions:
+- AD-005
+- AD-002
+- AD-003
+- AD-004
+out_of_scope:
+- Detecção de divergência entre prosa em Markdown e código
+- Adaptadores específicos por ferramenta (AGENTS.md cobre o MVP)
+requirements:
+- id: REQ-005
+  description: Impedir que código e spec divirjam ao longo das mudanças.
+  acceptance:
+  - id: AC-010
+    given: um arquivo em paths de uma feature alterado sem mudança na pasta da spec
+    when: sdd diff roda
+    then: o diff reprova apontando a feature
+  - id: AC-011
+    given: código e spec da mesma feature alterados juntos
+    when: sdd diff roda
+    then: o diff aprova
+  - id: AC-012
+    given: um arquivo de código alterado que nenhuma feature declara em paths
+    when: sdd diff roda
+    then: o diff reprova apontando o arquivo sem dono
+  - id: AC-013
+    given: um commit com SDD-No-Spec-Change(nome-da-feature) e motivo não vazio
+    when: sdd diff roda
+    then: o diff libera apenas o código daquela feature e registra o motivo como aviso
+  - id: AC-014
+    given: apenas a spec alterada, sem código
+    when: sdd diff roda
+    then: o diff aprova com aviso
+  - id: AC-015
+    given: alterações não commitadas e arquivos não rastreados
+    when: sdd diff roda
+    then: essas alterações entram na avaliação
+  - id: AC-087
+    given: edição na spec que não muda o conteúdo (só comentário, espaço em branco ou ordem de chaves)
+    when: sdd diff roda
+    then: a edição não conta como mudança de spec e o código alterado continua reprovando
+    forbidden:
+    - editar a spec de forma cosmética para liberar código
+  - id: AC-054
+    given: uma falha do git, como base inexistente
+    when: sdd diff roda
+    then: o diff sai com código 2 e a mensagem do git
+  - id: AC-090
+    given: exceção de diff sem feature, sem motivo, com feature inexistente ou alterações em outra feature
+    when: sdd diff roda
+    then: o diff reprova; o formato global legado só libera código com allow_global_diff_override ativo
+      e aviso de depreciação
+- id: REQ-020
+  description: Correção de bug sem mudar a spec, comprovada por teste de regressão.
+  acceptance:
+  - id: AC-081
+    given: código alterado sem spec, com SDD-Fix citando um critério e teste alterado que cita o ID
+    when: sdd diff roda
+    then: o diff aprova e registra a correção e o teste de regressão
+  - id: AC-082
+    given: SDD-Fix sem teste alterado que cite o ID, ou citando ID inexistente
+    when: sdd diff roda
+    then: o diff reprova
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivo ou chamada de biblioteca
+      source: histórico Git, specs e arquivos alterados
+      frequency: a cada execução do comando
+    egress:
+    - to: resultado estruturado e relatório quando aplicável
+      consumers:
+      - CLI
+      - biblioteca
+      - CI
+      freshness: imediata
+  alternatives:
+  - name: comparação semântica do YAML e exceções por feature
+    chosen: true
+    why: ignora alterações cosméticas e limita as exceções
+  - name: comparar apenas nomes de arquivos
+    why_not: comentários poderiam liberar código sem alterar contrato
+  risks:
+  - area: other
+    severity: medium
+    description: motor acoplado à CLI impede uso como biblioteca e testes isolados
+    mitigated_by:
+    - ARCH-001
+    - ARCH-002
+  dependencies:
+  - name: git
+    kind: process
+    timeout_ms: 60000
+    retry:
+      max_attempts: 1
+      backoff: none
+    fallback: 'nenhum: o diff sai com código 2 e a mensagem do git'
+    side_effects: false
+    idempotent: true
+    covered_by:
+    - AC-054
+tasks:
+- id: T-05
+  title: Impedir que código e spec divirjam ao longo das mudanças.
+  origin:
+  - REQ-005
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-010
+  - AC-011
+  - AC-012
+  - AC-013
+  - AC-014
+  - AC-015
+  - AC-087
+  - AC-054
+  - AC-090
+  status: done
+- id: T-20
+  title: Correção de bug sem mudar a spec, comprovada por teste de regressão.
+  origin:
+  - REQ-020
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-081
+  - AC-082
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+quality_gates:
+- compila
+paths:
+- src/sdd/diff.py

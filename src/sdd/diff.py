@@ -14,9 +14,10 @@ from pathlib import Path
 import yaml
 
 from .core import Project
+from .report import constitution_section, metadata, version_line
 
 GIT_TIMEOUT = 60  # segundos
-TRAILER = re.compile(r"^SDD-No-Spec-Change:[ \t]*(.+)$", re.MULTILINE)
+TRAILER = re.compile(r"^SDD-No-Spec-Change(?:\((?P<feature>[^)\r\n]*)\))?:[ \t]*(?P<reason>[^\r\n]*)$", re.MULTILINE)
 # Correção de bug: o código descumpria uma spec correta. Não exige mudar a spec, exige um
 # teste de regressão alterado no mesmo PR que cite o critério corrigido.
 FIX_TRAILER = re.compile(r"^SDD-Fix:[ \t]*(.+)$", re.MULTILINE)
@@ -103,6 +104,7 @@ class DiffResult:
     violations: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     override: str | None = None
+    overrides: dict[str, list[str]] = field(default_factory=dict)
     changed: list[str] = field(default_factory=list)
 
     @property
@@ -158,8 +160,21 @@ def _meaningful_spec_change(root: Path, rel: str, base: str) -> bool:
 
 def evaluate(proj: Project, changed: list[str], messages: str, merge_base: str = "HEAD") -> DiffResult:
     res = DiffResult(changed=changed)
-    m = TRAILER.search(messages)
-    res.override = m.group(1).strip() if m else None
+    features = {s.feature for s in proj.specs.values()}
+    for m in TRAILER.finditer(messages):
+        feature, reason = m['feature'], m['reason'].strip()
+        if not reason:
+            res.violations.append("SDD-No-Spec-Change exige motivo não vazio")
+        elif feature is None:
+            if proj.config and proj.config.allow_global_diff_override:
+                res.override = reason
+                res.warnings.append("SDD-No-Spec-Change global está deprecado; use SDD-No-Spec-Change(feature)")
+            else:
+                res.violations.append("SDD-No-Spec-Change exige feature: use SDD-No-Spec-Change(nome): motivo")
+        elif feature not in features:
+            res.violations.append(f"SDD-No-Spec-Change cita feature '{feature}' inexistente")
+        else:
+            res.overrides.setdefault(feature, []).append(reason)
     code_globs = proj.config.code if proj.config else []
     found: list[str] = []
     fix_ids = {i for line in FIX_TRAILER.findall(messages) for i in CRITERION.findall(line)}
@@ -193,10 +208,15 @@ def evaluate(proj: Project, changed: list[str], messages: str, merge_base: str =
                 res.warnings.append(f"{spec.feature}: correção de {i} sem mudar a spec, com teste de "
                                     f"regressão em {', '.join(regression[i])}")
         elif code and not spec_changed:
-            found.append(
+            violation = (
                 f"{spec.feature}: código alterado sem mudança em {spec_dir} "
                 f"({', '.join(code[:3])}{' …' if len(code) > 3 else ''})"
             )
+            reasons = res.overrides.get(spec.feature) or ([res.override] if res.override else [])
+            if reasons:
+                res.warnings.append(f"liberado por SDD-No-Spec-Change: {violation}; motivo: {'; '.join(reasons)}")
+            else:
+                found.append(violation)
         elif spec_changed and not code and spec.paths:
             res.warnings.append(f"{spec.feature}: spec alterada sem código (ok se a implementação vem depois)")
         # Dataset de eval é a régua: mudar a régua sem mudar a spec seria afrouxar o teste em silêncio.
@@ -209,8 +229,26 @@ def evaluate(proj: Project, changed: list[str], messages: str, merge_base: str =
         if code_globs and matches(f, code_globs) and f not in owned:
             found.append(f"{f}: código sem feature dona (declare em `paths` de alguma spec)")
 
-    if res.override:
-        res.warnings += [f"liberado por SDD-No-Spec-Change: {v}" for v in found]
-    else:
-        res.violations += found
+    res.violations += found
     return res
+
+
+def report(result: DiffResult, base: str, constitution=None) -> dict:
+    return {**metadata("diff"), "ok": result.ok, "base": base, "changed": result.changed,
+            "overrides": result.overrides, "legacy_override": result.override,
+            "warnings": result.warnings, "problems": result.violations, "constitution": constitution}
+
+
+def render_markdown(report: dict) -> str:
+    out = ["# Relatório de diff SDD", "", version_line(report), "",
+           f"**Resultado: {'APROVADO' if report['ok'] else 'REPROVADO'}**", "",
+           f"Base: `{report['base']}`. {len(report['changed'])} arquivo(s) alterado(s)."]
+    if report["overrides"]:
+        out += ["", "## Exceções por feature", ""]
+        for feature, reasons in report["overrides"].items():
+            out += [f"- {feature}: {reason}" for reason in reasons]
+    for title, key in [("Avisos", "warnings"), ("Problemas", "problems")]:
+        if report[key]:
+            out += ["", f"## {title}", ""] + [f"- {p}" for p in report[key]]
+    out += constitution_section(report.get("constitution"))
+    return "\n".join(out) + "\n"

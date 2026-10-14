@@ -37,7 +37,8 @@ O que o kit não garante, de onde vieram as ideias e o que vem depois.
 - O `diff` detecta divergência **por mudança** (código mexeu, spec não), não por conteúdo:
   edição semântica na spec (valores ou estrutura) satisfaz a regra; comentário, espaço e
   reordenação de chaves não contam. O revisor ainda confere se a edição descreve a mudança.
-  O trailer de exceção vale para o intervalo inteiro, não por feature.
+  O trailer de exceção é limitado à feature nomeada; ainda vale para o intervalo inteiro
+  daquela feature. O formato global exige opt-in de migração e emite aviso.
 - Sem orçamento de autonomia executável (hoje é texto na constituição) e sem
   `specify`/`plan` assistidos.
 
@@ -55,17 +56,19 @@ Ideias da [TLC Spec-Driven](https://agent-skills.techleads.club/tlc-spec-driven/
 | Discrimination sensor (LLM injeta falhas) | `sdd mutate`, mutação determinística |
 | Fluxo por fases, testes derivados da spec, blast radius | `AGENTS.md` e constituição gerados |
 
-**Não trouxemos:** o verificador LLM como aprovador (conflita com "nenhuma aprovação depende
-de LLM"), a camada de lições aprendidas e a orquestração de sub-agentes (são processo do
+**Não trouxemos:** um verificador LLM como aprovador de ACs e NFRs (evals com juiz LLM
+têm política própria, AD-004/AD-005), a camada de lições aprendidas e a orquestração de sub-agentes (são processo do
 agente, não verificação). Elas combinam bem com o sdd-kit se você usar a skill da TLC junto.
 
 ## Próximos passos sugeridos
 
 1. Orçamento de autonomia executável: caminhos protegidos que exigem aprovação (CODEOWNERS).
 2. Contratos: validar OpenAPI/JSON Schema contra a implementação como gate nativo.
-3. Trailer por feature (`SDD-No-Spec-Change(pedidos): ...`) para exceções mais estreitas.
+3. Associar exceções a arquivos ou commits específicos dentro da feature; hoje o alcance
+   é o intervalo da feature nomeada.
 
-Este repositório se verifica: `sdd check` na raiz roda a spec em `specs/features/FEATURE-001`.
+Este repositório se verifica: `sdd check` na raiz roda as oito specs de capacidades em
+`specs/features/FEATURE-*/spec.yaml`.
 
 ## Créditos
 

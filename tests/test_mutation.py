@@ -70,6 +70,54 @@ def mutate(root: Path):
     return runner.invoke(app, ["mutate", "-C", str(root)])
 
 
+def test_ac_093_temporarios_dos_filhos_nao_apagam_copias_irmas(tmp_path, monkeypatch):
+    import tempfile
+    from sdd import core, mutation
+
+    root = tmp_path / "project"
+    root.mkdir()
+    project(root, FORTE)
+    temp_area = tmp_path / "temporarios"
+    temp_area.mkdir()
+    sibling = temp_area / "sdd-mutate-irma"
+    sibling.mkdir()
+    marker = sibling / "preservar"
+    marker.write_text("sentinela", encoding="utf-8")
+    monkeypatch.setattr(tempfile, "tempdir", str(temp_area))
+    for key in ("TMPDIR", "TEMP", "TMP"):
+        monkeypatch.setenv(key, str(temp_area))
+    (root / "limpar.py").write_text(encoding="utf-8", data=(
+        "import pathlib, shutil, subprocess, sys, tempfile\n"
+        "for p in pathlib.Path(tempfile.gettempdir()).glob('sdd-mutate-*'):\n"
+        "    shutil.rmtree(p)\n"
+        "sys.exit(subprocess.call([sys.executable, '-m', 'pytest', '-q', '-x', '-p', 'no:cacheprovider', 't']))\n"))
+    proj = core.load(root)
+    proj.config.mutation.command = f"{PY} limpar.py"
+    rep = mutation.run_feature(proj, next(iter(proj.specs.values())))
+    assert rep.ok and rep.score == 1, rep.error
+    assert marker.read_text(encoding="utf-8") == "sentinela"
+
+
+def test_ac_093_copia_apagada_nao_aprova_com_pontuacao_parcial(tmp_path):
+    import json
+
+    project(tmp_path, FORTE, min_score=0)
+    (tmp_path / "apagar.py").write_text(encoding="utf-8", data=(
+        "from pathlib import Path\nimport shutil\n"
+        f"if Path('src/calc.py').read_text(encoding='utf-8') != {CODE!r}:\n"
+        "    shutil.rmtree('src')\n"
+        "    raise SystemExit(1)\n"))
+    cfg_file = tmp_path / "specs/sdd.yaml"
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
+    cfg["mutation"]["command"] = f"{PY} apagar.py"
+    cfg_file.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    r = mutate(tmp_path)
+    assert r.exit_code == 2 and "execução de mutação incompleta" in r.stderr
+    report = json.loads((tmp_path / ".sdd/mutation.json").read_text(encoding="utf-8"))
+    assert report[0]["ok"] is False and report[0]["error"]
+    assert any(m["status"] == "pending" for m in report[0]["mutants"])
+
+
 def test_ac_029_testes_fortes_matam_todos_e_aprovam(tmp_path):
     r = mutate(project(tmp_path, FORTE))
     assert r.exit_code == 0, r.output

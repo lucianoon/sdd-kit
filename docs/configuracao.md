@@ -16,6 +16,7 @@ gates:                     # comandos extras; reprovam se o exit code for difere
   type_check: "mypy src"
 
 code: ["src/**"]           # código de produção: arquivo aqui sem feature dona reprova o diff
+allow_global_diff_override: false  # migração temporária do trailer global; veja verificacao.md
 small_max_files: 3         # feature small que altera mais arquivos reprova o diff
 
 require_design: false      # camada design
@@ -39,6 +40,9 @@ evals:                     # camada evals
   timeout: 3600
   allow_llm_judge: false
 ```
+
+O mutate define `TMPDIR`, `TEMP` e `TMP` privados à cópia, substituindo esses três
+valores também quando aparecem em `mutation.env`. Os demais valores são preservados.
 
 ## Camadas
 

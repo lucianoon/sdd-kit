@@ -88,10 +88,67 @@ def test_ac_012_codigo_sem_dono_reprova(repo):
 
 def test_ac_013_trailer_libera_com_motivo(repo):
     write(repo, "src/pedidos/api.py", "x = 2\n")
-    commit(repo, "refactor: renomeia variável\n\nSDD-No-Spec-Change: só renomeação interna")
+    commit(repo, "refactor: renomeia variável\n\nSDD-No-Spec-Change(pedidos): só renomeação interna")
     r = run_diff(repo)
     assert r.exit_code == 0, r.output
     assert "liberado por SDD-No-Spec-Change: pedidos" in r.output
+    assert "só renomeação interna" in r.output
+
+
+def test_ac_090_excecao_nao_libera_outra_feature(repo):
+    spec = SPEC.replace("pedidos", "pagamentos").replace("REQ-001", "REQ-002").replace("AC-001", "AC-002")
+    write(repo, "specs/features/FEATURE-002/spec.yaml", spec)
+    write(repo, "src/pagamentos/api.py", "x = 1\n")
+    commit(repo, "segunda feature")
+    git(repo, "branch", "-f", "main", "HEAD")
+    write(repo, "src/pedidos/api.py", "x = 2\n")
+    write(repo, "src/pagamentos/api.py", "x = 2\n")
+    commit(repo, "refactor\n\nSDD-No-Spec-Change(pedidos): renomeação interna")
+    r = run_diff(repo)
+    assert r.exit_code == 1
+    assert "liberado por SDD-No-Spec-Change: pedidos" in r.stdout
+    assert "pagamentos: código alterado sem mudança" in r.stderr
+
+
+@pytest.mark.parametrize("trailer", [
+    "SDD-No-Spec-Change: renomeação interna",
+    "SDD-No-Spec-Change(pedidos):   ",
+    "SDD-No-Spec-Change(inexistente): renomeação interna",
+    "SDD-No-Spec-Change(): renomeação interna",
+])
+def test_ac_090_excecao_invalida_reprova(repo, trailer):
+    write(repo, "src/pedidos/api.py", "x = 2\n")
+    commit(repo, "refactor\n\n" + trailer)
+    assert run_diff(repo).exit_code == 1
+
+
+def test_ac_090_global_legado_exige_opt_in_e_avisa(repo):
+    write(repo, "specs/sdd.yaml", CONFIG + "allow_global_diff_override: true\n")
+    write(repo, "src/pedidos/api.py", "x = 2\n")
+    commit(repo, "refactor\n\nSDD-No-Spec-Change: renomeação interna")
+    r = run_diff(repo)
+    assert r.exit_code == 0, r.output
+    assert "global está deprecado" in r.output
+
+
+def test_ac_090_excecao_nao_libera_codigo_sem_dono(repo):
+    write(repo, "src/sem-dono.py", "x = 2\n")
+    commit(repo, "refactor\n\nSDD-No-Spec-Change(pedidos): renomeação interna")
+    r = run_diff(repo)
+    assert r.exit_code == 1 and "código sem feature dona" in r.stderr
+
+
+def test_ac_090_dataset_exige_spec_mesmo_com_excecao(repo):
+    from sdd import core
+    from sdd.diff import evaluate
+    from sdd.models import Eval
+
+    proj = core.load(repo)
+    spec = next(iter(proj.specs.values()))
+    spec.evals = [Eval(id="EVAL-001", metric="accuracy", dataset="evals/casos.jsonl",
+                       min_cases=1, threshold={"min": 0.9})]
+    res = evaluate(proj, ["evals/casos.jsonl"], "SDD-No-Spec-Change(pedidos): casos novos")
+    assert not res.ok and any("dataset de eval alterado" in v for v in res.violations)
 
 
 def test_ac_014_so_spec_aprova_com_aviso(repo):

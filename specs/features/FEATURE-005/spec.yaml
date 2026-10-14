@@ -1,0 +1,99 @@
+feature: arquitetura
+version: 2
+size: large
+summary: Verificar dependências declaradas nas regras ARCH, com exceções registradas.
+assumptions: []
+open_questions: []
+decisions:
+- AD-005
+- AD-002
+- AD-003
+- AD-004
+out_of_scope:
+- Detecção de divergência entre prosa em Markdown e código
+- Adaptadores específicos por ferramenta (AGENTS.md cobre o MVP)
+requirements:
+- id: REQ-012
+  description: Tornar regras de dependência entre camadas executáveis.
+  acceptance:
+  - id: AC-043
+    given: um arquivo sujeito a uma regra que importa um módulo proibido
+    when: sdd check ou sdd arch roda
+    then: a violação é reportada com regra, arquivo, linha e import, sem falso positivo por prefixo
+  - id: AC-044
+    given: um import relativo que alcança um caminho proibido
+    when: sdd arch roda
+    then: a violação é reportada
+  - id: AC-045
+    given: imports em JS/TS (from, require, import dinâmico, multilinha) e Go (simples e em bloco)
+    when: sdd arch roda
+    then: todos são reconhecidos
+  - id: AC-046
+    given: uma marcação sdd allow na linha do import
+    when: sdd arch roda
+    then: com motivo e regra certa vira exceção registrada; sem motivo ou com outra regra, continua violação
+  - id: AC-047
+    given: uma regra cujo glob não casa nenhum arquivo
+    when: sdd arch roda
+    then: o arch reprova em vez de aprovar em silêncio
+  - id: AC-048
+    given: imports dentro de comentários ou docstrings
+    when: sdd arch roda
+    then: eles não contam
+  - id: AC-058
+    given: aspas triplas dentro de uma string comum num arquivo Python
+    when: sdd arch ou sdd mutate leem o arquivo
+    then: o restante do arquivo continua sendo analisado
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivo ou chamada de biblioteca
+      source: regras ARCH e imports do código
+      frequency: a cada execução do comando
+    egress:
+    - to: resultado estruturado e relatório quando aplicável
+      consumers:
+      - CLI
+      - biblioteca
+      - CI
+      freshness: imediata
+  alternatives:
+  - name: análise de imports com tokenização e texto
+    chosen: true
+    why: cobre as stacks suportadas sem ferramentas externas
+  - name: um parser completo por linguagem
+    why_not: custo adicional; regras avançadas entram como gates
+  risks:
+  - area: other
+    severity: medium
+    description: motor acoplado à CLI impede uso como biblioteca e testes isolados
+    mitigated_by:
+    - ARCH-001
+    - ARCH-002
+  dependencies: []
+tasks:
+- id: T-12
+  title: Tornar regras de dependência entre camadas executáveis.
+  origin:
+  - REQ-012
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-043
+  - AC-044
+  - AC-045
+  - AC-046
+  - AC-047
+  - AC-048
+  - AC-058
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+quality_gates:
+- compila
+paths:
+- src/sdd/arch.py

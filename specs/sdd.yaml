@@ -7,6 +7,7 @@ gates:
 code:
   - src/**
 require_design: true
+require_tasks: true
 mutation:
   command: "python -m pytest -q -x -p no:cacheprovider -k 'not nfr_001'"
   env:

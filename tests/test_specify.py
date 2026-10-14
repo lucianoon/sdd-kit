@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 
 import yaml
+import pytest
 from typer.testing import CliRunner
 
 from sdd import core
@@ -48,6 +49,32 @@ def test_ac_061_size_define_as_secoes(tmp_path):
     pequena = yaml.safe_load((tmp_path / "specs/features/FEATURE-003/spec.yaml").read_text(encoding="utf-8"))
     assert "design" in grande and grande["design"]["dependencies"] == []
     assert "design" not in pequena
+
+
+@pytest.mark.parametrize("enabled,size,expected", [
+    (False, "small", False), (False, "large", False),
+    (True, "small", False), (True, "large", True),
+])
+def test_ac_061_tarefas_dependem_da_camada_e_do_size(tmp_path, enabled, size, expected):
+    init(tmp_path)
+    cfg_file = tmp_path / "specs/sdd.yaml"
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
+    cfg["require_tasks"] = enabled
+    cfg_file.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    r = specify(tmp_path, "nova", "--size", size)
+    assert r.exit_code == 0, r.output
+    spec = yaml.safe_load((tmp_path / "specs/features/FEATURE-002/spec.yaml").read_text(encoding="utf-8"))
+    assert ("tasks" in spec) is expected
+
+
+def test_ac_061_render_como_biblioteca_omite_camadas_opcionais_por_padrao():
+    from sdd.specify import render
+
+    args = ("exemplo", "small", 1, {"REQ": 0, "AC": 0, "NFR": 0}, False)
+    minimal = yaml.safe_load(render(*args))
+    assert "tasks" not in minimal and "design" not in minimal
+    with_tasks = yaml.safe_load(render(*args, with_tasks=True))
+    assert with_tasks["tasks"][0]["origin"] == ["REQ-001"]
 
 
 def test_ac_062_esqueleto_nao_passa_ate_ser_preenchido(tmp_path):

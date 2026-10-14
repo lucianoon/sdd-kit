@@ -1,0 +1,178 @@
+feature: governanca
+version: 2
+size: large
+summary: Validar decisões e tarefas e reportar constituição, evidências e versão sem aprovação implícita.
+assumptions: []
+open_questions: []
+decisions:
+- AD-005
+- AD-002
+- AD-003
+- AD-004
+out_of_scope:
+- Detecção de divergência entre prosa em Markdown e código
+- Adaptadores específicos por ferramenta (AGENTS.md cobre o MVP)
+requirements:
+- id: REQ-009
+  description: Manter um registro de decisões do projeto referenciável pelas specs.
+  acceptance:
+  - id: AC-026
+    given: uma spec que referencia uma decisão inexistente
+    when: as specs são carregadas
+    then: a referência é reportada como erro
+  - id: AC-027
+    given: uma spec que referencia uma decisão substituída
+    when: as specs são carregadas
+    then: o erro aponta a decisão substituta
+  - id: AC-028
+    given: uma decisão substituída sem substituta válida
+    when: as specs são carregadas
+    then: a decisão é reportada como erro
+- id: REQ-017
+  description: Tarefas rastreáveis da origem à evidência.
+  acceptance:
+  - id: AC-073
+    given: tarefas com origem, evidência ou dependência inexistente, ou ID repetido
+    when: as specs são carregadas
+    then: cada problema é reportado; origem pode ser REQ, AC, NFR, EVAL, ARCH ou CONST
+  - id: AC-074
+    given: dependências entre tarefas que formam ciclo
+    when: as specs são carregadas
+    then: o ciclo é reportado com o caminho completo
+  - id: AC-075
+    given: um AC, NFR ou EVAL que nenhuma tarefa cita
+    when: as specs são carregadas
+    then: é reportado como requisito órfão; citar o REQ cobre todos os seus ACs
+  - id: AC-076
+    given: uma tarefa done
+    when: as specs são carregadas ou o check roda
+    then: exige evidência, e evidência que não passa reprova o check
+  - id: AC-077
+    given: require_tasks ativo
+    when: uma spec de size exigido não tem tarefas
+    then: a ausência é reportada como erro
+- id: REQ-018
+  description: Constituição executável.
+  acceptance:
+  - id: AC-078
+    given: princípios em specs/constitution.yaml
+    when: as specs são carregadas
+    then: cada um exige enforced_by válido (ARCH, AC, NFR, EVAL, gate, kit, profile) ou manual
+  - id: AC-079
+    given: uma constituição com princípios cobrados por testes, gates e revisão manual
+    when: sdd check roda
+    then: os gates citados rodam e os princípios mostram APROVADO, VIOLADO, PENDENTE, DECLARADO, NÃO_APLICÁVEL
+      ou MANUAL conforme a evidência desta execução
+  - id: AC-089
+    given: princípios ligados a comandos separados, evals não executadas ou regras sem aplicação
+    when: a constituição é reportada
+    then: referências declaradas não são aprovação; check deixa diff, mutate e eval aplicáveis PENDENTES,
+      e comandos sem objeto são NÃO_APLICÁVEIS
+- id: REQ-019
+  description: Detectar critérios de aceitação vagos.
+  acceptance:
+  - id: AC-080
+    given: um critério com termos vagos e nenhum valor numérico
+    when: as specs são carregadas
+    then: é aviso por padrão e erro com strict_criteria, sem falso positivo em palavras compostas
+- id: REQ-022
+  description: Identificar versão, formato e alcance de cada relatório de verificação.
+  acceptance:
+  - id: AC-091
+    given: execução de check, diff, mutate, eval ou arch
+    when: o relatório é produzido
+    then: JSON e Markdown identificam a versão do kit, report_version e o comando; mutation.json preserva
+      a lista por feature
+  - id: AC-092
+    given: as specs do próprio kit
+    when: a propriedade do código é avaliada
+    then: cada arquivo de produção tem uma feature dona, sem um glob único que cubra todo src/sdd
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivo ou chamada de biblioteca
+      source: decisões, tarefas, constituição e resultados desta execução
+      frequency: a cada execução do comando
+    egress:
+    - to: resultado estruturado e relatório quando aplicável
+      consumers:
+      - CLI
+      - biblioteca
+      - CI
+      freshness: imediata
+  alternatives:
+  - name: IDs explícitos e estados de evidência por comando
+    chosen: true
+    why: uma referência não é confundida com uma execução
+  - name: inferir aprovação a partir da declaração da regra
+    why_not: pode aprovar verificações que não foram executadas
+  risks:
+  - area: other
+    severity: medium
+    description: motor acoplado à CLI impede uso como biblioteca e testes isolados
+    mitigated_by:
+    - ARCH-001
+    - ARCH-002
+  dependencies: []
+tasks:
+- id: T-09
+  title: Manter um registro de decisões do projeto referenciável pelas specs.
+  origin:
+  - REQ-009
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-026
+  - AC-027
+  - AC-028
+  status: done
+- id: T-17
+  title: Tarefas rastreáveis da origem à evidência.
+  origin:
+  - REQ-017
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-073
+  - AC-074
+  - AC-075
+  - AC-076
+  - AC-077
+  status: done
+- id: T-18
+  title: Constituição executável.
+  origin:
+  - REQ-018
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-078
+  - AC-079
+  - AC-089
+  status: done
+- id: T-19
+  title: Detectar critérios de aceitação vagos.
+  origin:
+  - REQ-019
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-080
+  status: done
+- id: T-22
+  title: Identificar versão, formato e alcance de cada relatório de verificação.
+  origin:
+  - REQ-022
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-091
+  - AC-092
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+quality_gates:
+- compila
+paths:
+- src/sdd/analysis.py
+- src/sdd/report.py

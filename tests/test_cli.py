@@ -24,6 +24,15 @@ def test_sem_argumentos_mostra_ajuda_sem_autocompletar():
     assert "specify" in r.output and "--install-completion" not in r.output
 
 
+def test_ac_091_version_tem_precedencia_sobre_subcomando_invalido():
+    from sdd import __version__
+
+    r = run("--version", "comando-inexistente")
+    assert r.exit_code == 0 and r.stdout.strip() == f"sdd-kit {__version__}"
+    r = run("--version", "--help")
+    assert r.exit_code == 0 and r.stdout.strip() == f"sdd-kit {__version__}"
+
+
 def test_erros_de_specify_e_validate_vao_para_stderr(tmp_path):
     r = run("specify", "Nome_Ruim", "-C", str(tmp_path))
     assert r.exit_code == 2 and "nome inválido" in r.stderr and "ERRO" not in r.stdout

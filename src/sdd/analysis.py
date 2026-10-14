@@ -159,22 +159,62 @@ def check_constitution(proj, constitution) -> list[str]:
     return errors
 
 
+def kit_context(proj, completed: dict[str, str]) -> dict[str, str]:
+    """Escopo desta execução. Não lê relatórios antigos para inferir aprovação."""
+    specs = list(proj.specs.values())
+    states = {key: "PENDENTE" for key in ENFORCERS_KIT}
+    states.update({
+        "validate": "FALHOU" if proj.errors else "OK",
+        "design": "OK" if any(s.design for s in specs) else "NÃO_APLICÁVEL",
+        "tasks": "OK" if any(s.tasks for s in specs) else "NÃO_APLICÁVEL",
+        "dependencies": "OK" if any(s.design and s.design.dependencies for s in specs) else "NÃO_APLICÁVEL",
+        "limits": "OK" if any(s.design and s.design.limits for s in specs) else "NÃO_APLICÁVEL",
+    })
+    applicable = {
+        "diff": bool(proj.config and proj.config.code) or any(s.paths or s.evals for s in specs),
+        "mutate": any(s.paths for s in specs),
+        "eval": any(s.evals for s in specs),
+        "arch": bool(proj.arch),
+        "profile": proj.agents is not None,
+    }
+    for key, applies in applicable.items():
+        if not applies:
+            states[key] = "NÃO_APLICÁVEL"
+    states.update(completed)
+    return states
+
+
 def constitution_matrix(constitution, verdicts: dict[str, str], gates: dict[str, bool],
-                        profile_states: dict[str, str]) -> list[dict]:
+                        profile_states: dict[str, str], kit_states: dict[str, str] | None = None) -> list[dict]:
     rows = []
     for p in constitution.principles:
         refs = []
         for ref in p.enforced_by:
             if ref.startswith("gate:"):
-                state = "OK" if gates.get(ref[5:]) else ("FALHOU" if ref[5:] in gates else "não executado")
+                state = "OK" if gates.get(ref[5:]) else ("FALHOU" if ref[5:] in gates else "PENDENTE")
             elif ref.startswith("kit:"):
-                state = "regra do kit"
+                state = (kit_states or {}).get(ref[4:], "DECLARADO")
             elif ref.startswith("profile:"):
-                state = profile_states.get(ref[8:], "?")
+                state = profile_states.get(ref[8:], "PENDENTE")
             else:
-                state = verdicts.get(ref, "ver sdd eval" if ref.startswith("EVAL-") else "?")
+                state = verdicts.get(ref, "PENDENTE")
             refs.append({"ref": ref, "state": state})
-        bad = [r for r in refs if r["state"] in ("FALHOU", "VIOLADA", "FALHA", "SEM_TESTE", "PULADO")]
-        status = "VIOLADO" if bad else ("MANUAL" if not refs else "COBRADO")
+        states = {"NÃO_APLICÁVEL" if r["state"].startswith("N/A:") else r["state"] for r in refs}
+        passing = {"OK", "COBERTO", "NÃO APLICÁVEL", "NÃO_APLICÁVEL"}
+        bad = states - passing - {"PENDENTE", "DECLARADO"}
+        if bad:
+            status = "VIOLADO"
+        elif not refs:
+            status = "MANUAL"
+        elif "PENDENTE" in states:
+            status = "PENDENTE"
+        elif "DECLARADO" in states:
+            status = "DECLARADO"
+        elif p.manual.strip():
+            status = "MANUAL"
+        elif states == {"NÃO_APLICÁVEL"}:
+            status = "NÃO_APLICÁVEL"
+        else:
+            status = "APROVADO"
         rows.append({"id": p.id, "rule": p.rule, "status": status, "enforced_by": refs, "manual": p.manual})
     return rows

@@ -5,9 +5,46 @@ import json
 from pathlib import Path
 
 
+def metadata(command: str) -> dict:
+    from . import __version__
+
+    return {"report_version": 1, "tool_version": __version__, "command": command}
+
+
+def version_line(report: dict) -> str:
+    if "tool_version" not in report:
+        return ""
+    return (f"sdd-kit {report['tool_version']} · formato {report['report_version']} "
+            f"· comando `{report['command']}`")
+
+
+def write_command_report(root: Path, command: str, report, markdown: str) -> Path:
+    d = root / ".sdd"
+    d.mkdir(exist_ok=True)
+    (d / f"{command}.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    md = d / f"{command}.md"
+    md.write_text(markdown, encoding="utf-8")
+    return md
+
+
+def constitution_section(rows: list[dict] | None) -> list[str]:
+    if not rows:
+        return []
+    out = ["", "## Constituição", "", "| Princípio | Estado | Evidência |", "|---|---|---|"]
+    for c in rows:
+        how = ", ".join(f"{r['ref']} ({r['state']})" for r in c["enforced_by"])
+        if c["manual"]:
+            how += ("; " if how else "") + f"revisão manual: {c['manual']}"
+        out.append(f"| {c['id']} {c['rule']} | {c['status']} | {how} |")
+    pending = [c["id"] for c in rows if c["status"] in ("PENDENTE", "DECLARADO")]
+    if pending:
+        out += ["", "Verificações constitucionais pendentes nesta execução: " + ", ".join(pending) + "."]
+    return out
+
+
 def render_markdown(report: dict) -> str:
     verdicts = {r["id"]: r["verdict"] for r in report["criteria"]}
-    out = ["# Relatório de conformidade SDD", "",
+    out = ["# Relatório de conformidade SDD", "", version_line(report), "",
            f"**Resultado: {'APROVADO' if report['ok'] else 'REPROVADO'}**", "",
            "| Feature | Origem | Critério | Descrição | Veredito | Testes |", "|---|---|---|---|---|---|"]
     for r in report["criteria"]:
@@ -53,12 +90,7 @@ def render_markdown(report: dict) -> str:
             out.append(f"| {d['feature']} | {d['name']} ({d['kind']}) | {d['timeout_ms']} ms | "
                        f"{d['retry']['max_attempts']} | {'sim' if d['side_effects'] else 'não'} | "
                        f"{'sim' if d['idempotent'] else 'não'} | {d['fallback']} | {tested} |")
-    const = report.get("constitution")
-    if const:
-        out += ["", "## Constituição", "", "| Princípio | Estado | Cobrado por |", "|---|---|---|"]
-        for c in const:
-            how = ", ".join(f"{r['ref']} ({r['state']})" for r in c["enforced_by"]) or f"revisão manual: {c['manual']}"
-            out.append(f"| {c['id']} {c['rule']} | {c['status']} | {how} |")
+    out += constitution_section(report.get("constitution"))
     if report.get("tasks"):
         out += ["", "## Tarefas", "", "| Feature | Tarefa | Status | Origem | Evidência |", "|---|---|---|---|---|"]
         for tk in report["tasks"]:

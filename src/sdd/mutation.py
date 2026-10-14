@@ -79,6 +79,14 @@ class MutationReport:
     def ok(self) -> bool:
         return self.error is None and self.score >= self.min_score
 
+    @property
+    def verdict(self) -> str:
+        if self.error:
+            return "ERRO"
+        if not self.mutants:
+            return "NÃO_APLICÁVEL"
+        return "APROVADO" if self.ok else "REPROVADO"
+
 
 def _code_region(line: str) -> int:
     """Índice onde começa um comentário de fim de linha fora de string (ou len)."""
@@ -149,7 +157,7 @@ def sample(items: list[Mutant], k: int) -> list[Mutant]:
 
 def _copy_project(root: Path, link: list[str]) -> Path:
     dest = Path(tempfile.mkdtemp(prefix="sdd-mutate-")) / "p"
-    ignore_always = {".git", ".sdd", "__pycache__", ".pytest_cache", ".mypy_cache"}
+    ignore_always = {".git", ".sdd", ".sdd-tmp", "__pycache__", ".pytest_cache", ".mypy_cache"}
 
     def ignore(d, names):
         return [n for n in names if n in ignore_always or n in link or n.endswith(".egg-info")]
@@ -245,6 +253,10 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
     clock = _Clock()
     try:
         env = {**os.environ, **{k: v.replace("{root}", str(work)) for k, v in cfg.env.items()}}
+        private_tmp = work / ".sdd-tmp"
+        private_tmp.mkdir()
+        # Autotestes do sweep, inclusive mutados, só enxergam temporários desta cópia.
+        env.update({key: str(private_tmp) for key in ("TMPDIR", "TEMP", "TMP")})
         # Bytecode em cache faria o Python rodar o código antigo quando a mutação não muda o
         # tamanho do arquivo (ex.: + → -) e ocorre no mesmo segundo: falso sobrevivente.
         env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -257,9 +269,7 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
             try:
                 original = _read(target)
             except OSError:
-                m.status = "killed"  # o trabalho inteiro acabou: mutante disco-máquina
-                if on_result:
-                    on_result(m)
+                rep.error = "cópia de trabalho indisponível; execução de mutação incompleta"
                 break
             lines = original.splitlines(keepends=True)
             nl = lines[m.line - 1][len(lines[m.line - 1].rstrip("\r\n")):]
@@ -271,22 +281,31 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
                 try:
                     _write(target, original, clock)
                 except OSError:
-                    pass  # a suíte removeu o próprio arquivo: mutante já está morto
+                    rep.error = "cópia de trabalho indisponível; execução de mutação incompleta"
             m.status = {"failed": "killed", "passed": "survived", "timeout": "timeout"}[result]
             if on_result:
                 on_result(m)
+            if rep.error:
+                break
     finally:
         shutil.rmtree(work.parent, ignore_errors=True)  # sdd: no-mutate (proteção; rmtree normal não falha)
     return rep
 
 
-def render_markdown(reports: list[MutationReport]) -> str:
-    out = ["# Relatório de mutação SDD", ""]
+def render_markdown(reports: list[MutationReport], constitution=None, scope=None) -> str:
+    from .report import metadata, version_line, constitution_section
+
+    out = ["# Relatório de mutação SDD", "", version_line(metadata("mutate")), ""]
+    if scope:
+        out += [f"Features: {', '.join(scope['features'])}. Base: {scope['base'] or 'projeto inteiro'}.", ""]
     for r in reports:
-        status = "ERRO" if r.error else ("APROVADO" if r.ok else "REPROVADO")
+        status = r.verdict
         out.append(f"## {r.feature}: {status}")
         if r.error:
             out += ["", r.error, ""]
+            continue
+        if not r.mutants:
+            out += ["", "Nenhum candidato a mutação neste alcance.", ""]
             continue
         out += ["", f"Score {r.score:.0%} (mínimo {r.min_score:.0%}): {r.killed}/{len(r.mutants)} "
                 f"mutantes mortos, amostrados de {r.candidates} candidatos.", ""]
@@ -295,4 +314,5 @@ def render_markdown(reports: list[MutationReport]) -> str:
             out += ["| Onde | Operador | Linha mutada |", "|---|---|---|"]
             out += [f"| `{m.where}` | {m.operator} | `{m.mutated.strip()}` |" for m in surv]
             out.append("")
+    out += constitution_section(constitution)
     return "\n".join(out) + "\n"

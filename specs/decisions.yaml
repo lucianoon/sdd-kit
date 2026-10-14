@@ -1,6 +1,8 @@
 decisions:
   - id: AD-001
     title: Nenhuma aprovação depende de LLM
+    status: superseded
+    superseded_by: AD-005
     decision: Todo veredito do sdd vem de execução determinística (testes, gates, git, mutação).
     rationale: Um LLM pode ser útil como revisor, mas aprovar exige reprodutibilidade.
   - id: AD-002
@@ -14,10 +16,20 @@ decisions:
       ACs e NFRs nunca usam juiz LLM. O sdd agrega sempre de forma determinística e o
       relatório marca esses evals como probabilísticos.
     rationale: >-
-      Algumas qualidades de LLM só são medíveis por outro modelo. Proibir deixaria a camada
-      de comportamento sem gate; permitir em silêncio violaria a AD-001. A marcação torna a
-      exceção visível e auditável.
+      O julgamento de casos pode ser probabilístico mesmo quando a agregação é
+      determinística. A política e o relatório tornam essa dependência visível,
+      conforme AD-005; a revisão humana do harness e do dataset continua necessária.
   - id: AD-003
     title: Mutação textual por operadores
     decision: sdd mutate troca operadores no texto, numa cópia isolada, e lê só o exit code.
     rationale: Agnóstico de linguagem; ferramentas dedicadas (mutmut, Stryker) seguem usáveis como gates.
+  - id: AD-005
+    title: Verificações externas ao agente, com alcance e tipo de evidência explícitos
+    decision: >-
+      Testes, gates, diff, arquitetura e mutação produzem vereditos por execução de
+      ferramentas. A agregação de evals é determinística, mas evals com judge: llm
+      dependem de julgamento probabilístico e exigem política explícita (AD-004).
+      Uma declaração de cobrança não comprova que o comando foi executado.
+    rationale: >-
+      Distinguir execução, declaração e julgamento probabilístico impede que um
+      relatório aprovado sugira garantias além das evidências coletadas.

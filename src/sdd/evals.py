@@ -15,6 +15,7 @@ from pathlib import Path
 from .core import Project, dataset_ids
 from .procs import run_shell
 from .models import Eval
+from .report import metadata, version_line, constitution_section
 
 Z95 = 1.959964
 
@@ -107,7 +108,8 @@ def evaluate(feature: str, ev: Eval, known: set[str], results: Path) -> dict:
 def run(proj: Project) -> dict:
     cfg = proj.config.evals
     pairs = [(s, e) for s in proj.specs.values() for e in s.evals]
-    report = {"ok": True, "problems": [], "evals": [], "harness": None}
+    report = {**metadata("eval"), "ok": True, "problems": [], "evals": [], "harness": None,
+              "probabilistic": any(e.judge == "llm" for _, e in pairs)}
     if not pairs:
         return report
     if not cfg.command:
@@ -136,8 +138,9 @@ def run(proj: Project) -> dict:
 
 
 def render_markdown(report: dict) -> str:
-    out = ["# Relatório de evals SDD", "",
-           f"**Resultado: {'APROVADO' if report['ok'] else 'REPROVADO'}**", "",
+    tag = " (evidência probabilística)" if report.get("probabilistic") else ""
+    out = ["# Relatório de evals SDD", "", version_line(report), "",
+           f"**Resultado: {'APROVADO' if report['ok'] else 'REPROVADO'}{tag}**", "",
            "| Feature | Eval | Métrica | Valor | IC 95% | Variação | Limite | Juiz | Veredito |",
            "|---|---|---|---|---|---|---|---|---|"]
     llm = False
@@ -157,4 +160,5 @@ def render_markdown(report: dict) -> str:
                 "Trate como evidência, não como prova; revise uma amostra manualmente."]
     if report["problems"]:
         out += ["", "## Problemas", ""] + [f"- {p}" for p in report["problems"]]
+    out += constitution_section(report.get("constitution"))
     return "\n".join(out) + "\n"

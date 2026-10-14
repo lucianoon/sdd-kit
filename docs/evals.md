@@ -60,8 +60,9 @@ quando até o cenário pessimista está acima do limite. Isso obriga datasets do
 **Juiz LLM.** Algumas qualidades só são medíveis por outro modelo ("a resposta é fiel ao
 documento?"). O kit permite, de forma explícita e auditável (decisão AD-004):
 `judge: llm` só é aceito com `evals.allow_llm_judge: true` na config; a agregação continua
-determinística; o relatório marca o eval como **probabilístico** e recomenda revisar uma
-amostra. ACs e NFRs nunca usam juiz LLM.
+determinística, mas a evidência e a aprovação do eval dependem do julgamento do modelo.
+O JSON registra `probabilistic: true` e o Markdown marca o resultado como
+**evidência probabilística**, recomendando revisar uma amostra. ACs e NFRs nunca usam juiz LLM.
 
 `sdd eval` fica fora do `sdd check` porque chama APIs de LLM (custo, tempo, segredo).
 O workflow gerado traz o passo comentado.

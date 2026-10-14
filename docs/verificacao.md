@@ -8,7 +8,7 @@ Divergência entre código e spec (`sdd diff`), tratamento de mudanças e força
 |---|---|---|
 | Mudou o comportamento desejado | atualize a spec primeiro | spec alterada junto com o código |
 | Bug: código descumpre uma spec correta | corrija e acrescente teste de regressão | `SDD-Fix: AC-012` no commit **e** um arquivo de teste alterado que cite `AC-012` |
-| Mudou só a solução técnica | preserve o comportamento | `SDD-No-Spec-Change: <motivo>` no commit |
+| Mudou só a solução técnica | preserve o comportamento | `SDD-No-Spec-Change(nome-da-feature): <motivo>` no commit |
 
 Correção sem teste de regressão reprova: "corrigi" sem um teste que pegaria o bug de volta
 não comprova nada. Onde ficam os testes: `tests.paths` em `specs/sdd.yaml` (padrão cobre
@@ -54,20 +54,27 @@ estrutura), não o texto. Acrescentar um comentário ou reformatar a spec produz
 ```
 refactor: extrai validação de pedido
 
-SDD-No-Spec-Change: só reorganização interna, sem mudança de comportamento
+SDD-No-Spec-Change(pedidos): só reorganização interna, sem mudança de comportamento
 ```
 
-O diff aprova e imprime o motivo. A exceção fica auditável no histórico do git, e a revisão
-humana decide se o motivo procede. Exit codes: `0` aprovado, `1` reprovado, `2` erro de git
+O diff libera apenas o código da feature `pedidos` e imprime o motivo. Outras features
+continuam exigindo mudança na própria spec. Código sem dono e dataset alterado sem spec
+sempre reprovam. Feature inexistente e motivo vazio são erros. As exceções ficam no
+histórico do Git e em `.sdd/diff.json` e `.sdd/diff.md`; a revisão humana confere o motivo.
+
+**Migração da versão 0.11:** o trailer global `SDD-No-Spec-Change: motivo` reprova por
+padrão. Para migrar aos poucos, `allow_global_diff_override: true` na config aceita
+temporariamente o formato legado com aviso de depreciação. Exit codes: `0` aprovado, `1` reprovado, `2` erro de git
 (ex.: base inexistente; no CI, use `fetch-depth: 0`).
 
 ## Qualidade dos testes: `sdd mutate`
 
 O `check` prova que existe um teste com o ID e que ele passa. Não prova que o teste
 **verifica** algo: `def test_ac_001(): criar_pedido()` passa sem assert nenhum. O `mutate`
-fecha essa brecha sem LLM:
+mede a detecção dos operadores amostrados sem LLM:
 
-1. Copia o projeto para um diretório temporário (o seu nunca é tocado).
+1. Copia o projeto para um diretório temporário. Os filhos recebem `TMPDIR`, `TEMP`
+   e `TMP` privados à cópia; uma limpeza no runner não alcança cópias irmãs.
 2. Confere que a suíte passa sem mutações (senão, sai com código 2).
 3. Para cada mutante, troca **um** operador no código dos `paths` da feature
    (`>`→`<=`, `==`→`!=`, `and`→`or`, `True`→`False`, `+`→`-`...) e roda os testes.
@@ -105,3 +112,6 @@ Use um `command` mais rápido (subconjunto, `-x`) e `--base` no CI.
 Para mutação mais profunda, ferramentas dedicadas (mutmut, Stryker, pitest, cargo-mutants)
 entram como `gates` comuns; o `mutate` embutido existe para funcionar em qualquer stack sem
 instalar nada.
+
+Se a suíte apagar a cópia de trabalho e impedir a restauração, o mutate registra
+execução incompleta e sai com código 2; uma pontuação parcial nunca aprova esse erro.

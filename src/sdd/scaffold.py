@@ -212,7 +212,7 @@ principles:
     rule: As specs são a fonte da verdade; código que diverge delas está errado.
     enforced_by: [kit:diff]
   - id: CONST-02
-    rule: Todo AC e NFR tem teste passando cujo nome contém o ID; "pronto" é o check verde.
+    rule: Todo AC e NFR tem teste passando cujo nome contém o ID; o check verde aprova seu alcance declarado.
     enforced_by: [kit:check]
   - id: CONST-03
     rule: Testes detectam código errado; nunca são enfraquecidos para passar.
@@ -230,7 +230,7 @@ principles:
     rule: Toda dependência externa declara timeout, retry, fallback e idempotência.
     enforced_by: [kit:dependencies]
   - id: CONST-08
-    rule: Comportamento de LLM é verificado por evals estatísticos, nunca por um teste isolado.
+    rule: Comportamento de LLM exige evals estatísticos; juiz LLM precisa de política explícita e evidência marcada como probabilística.
     enforced_by: [kit:eval]
   - id: CONST-09
     rule: Push, deploy, migração destrutiva, banco de produção e mudança de contrato público
@@ -284,7 +284,8 @@ Nenhuma decisão vive só na conversa: o que importa fica no repositório.
    Lacuna resolvida por padrão vira `assumptions`, com justificativa.
 4. **Testes vêm dos critérios**, não do código que você escreveu. O nome do teste contém
    o ID: `test_ac_001_...`, `it("AC-001 ...")`, `TestAC001...`.
-5. **Pronto é comando verde.** Rode `sdd validate && sdd check` e cole a saída.
+5. **Verifique o alcance.** Rode `sdd validate && sdd check` e cole a saída. Execute
+   também diff, mutate e eval quando aplicáveis; princípios PENDENTE exigem verificação própria.
 
 ## Mudanças
 
@@ -292,7 +293,7 @@ Nenhuma decisão vive só na conversa: o que importa fica no repositório.
 |---|---|---|
 | Mudou o comportamento | atualize a spec junto com o código | — |
 | Bug (código descumpre spec correta) | corrija e adicione teste de regressão com o ID | `SDD-Fix: AC-NNN` |
-| Só a solução técnica mudou | preserve o comportamento | `SDD-No-Spec-Change: <motivo>` |
+| Só a solução técnica mudou | preserve o comportamento | `SDD-No-Spec-Change(nome-da-feature): <motivo>` |
 
 ## Nunca
 

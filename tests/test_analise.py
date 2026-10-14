@@ -189,7 +189,7 @@ def test_ac_079_check_cobra_e_mostra_a_constituicao(tmp_path):
     report = core.check(core.load(tmp_path))
     assert not report["ok"] and "gate 'segredos' falhou (código 1)" in report["problems"]
     rows = {c["id"]: c for c in report["constitution"]}
-    assert rows["CONST-01"]["status"] == "COBRADO"
+    assert rows["CONST-01"]["status"] == "APROVADO"
     assert rows["CONST-02"]["status"] == "VIOLADO"
     assert rows["CONST-03"]["status"] == "MANUAL"
     md = core.render_markdown(report)

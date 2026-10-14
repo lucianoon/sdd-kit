@@ -1,0 +1,102 @@
+feature: perfil-agentes
+version: 2
+size: large
+summary: Cobrar o catálogo de requisitos de agentes por evidências ou justificativas explícitas.
+assumptions: []
+open_questions: []
+decisions:
+- AD-005
+- AD-002
+- AD-003
+- AD-004
+out_of_scope:
+- Detecção de divergência entre prosa em Markdown e código
+- Adaptadores específicos por ferramenta (AGENTS.md cobre o MVP)
+requirements:
+- id: REQ-015
+  description: Perfil de agentes — requisitos de referência da SPEC-BASE cobrados por evidência.
+  acceptance:
+  - id: AC-063
+    given: sdd init --profile agentes
+    when: o projeto é validado
+    then: a matriz traz todos os módulos com o núcleo ativo e cobra evidência de cada requisito do núcleo
+  - id: AC-064
+    given: um módulo pendente ou não declarado
+    when: as specs são carregadas
+    then: é aviso no estágio local e erro nos estágios piloto e produção; o núcleo nunca pode faltar
+  - id: AC-065
+    given: requisitos de módulo ativo
+    when: as specs são carregadas
+    then: cada um exige IDs existentes ou not_applicable com motivo; módulo inativo exige motivo
+  - id: AC-066
+    given: um requisito crítico
+    when: as specs são carregadas
+    then: exige ao menos um AC, NFR ou ARCH e não aceita not_applicable
+  - id: AC-067
+    given: o estágio produção
+    when: as specs são carregadas
+    then: o módulo P precisa estar ativo
+  - id: AC-068
+    given: o perfil ativo
+    when: sdd check roda
+    then: o relatório mostra cada requisito ativo com o estado real das evidências
+  - id: AC-069
+    given: um projeto com perfil de agentes
+    when: uma spec tem design
+    then: design.limits é obrigatório
+    forbidden:
+    - limite zero ou ausente aceito como válido
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivo ou chamada de biblioteca
+      source: catálogo de agentes e evidências declaradas no projeto
+      frequency: a cada execução do comando
+    egress:
+    - to: resultado estruturado e relatório quando aplicável
+      consumers:
+      - CLI
+      - biblioteca
+      - CI
+      freshness: imediata
+  alternatives:
+  - name: catálogo versionado com IDs e matriz de evidências
+    chosen: true
+    why: a cobertura fica rastreável e requisitos críticos não admitem dispensa
+  - name: checklist livre em prosa
+    why_not: não permite validar referências nem estados automaticamente
+  risks:
+  - area: other
+    severity: medium
+    description: motor acoplado à CLI impede uso como biblioteca e testes isolados
+    mitigated_by:
+    - ARCH-001
+    - ARCH-002
+  dependencies: []
+tasks:
+- id: T-15
+  title: Perfil de agentes — requisitos de referência da SPEC-BASE cobrados por evidência.
+  origin:
+  - REQ-015
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-063
+  - AC-064
+  - AC-065
+  - AC-066
+  - AC-067
+  - AC-068
+  - AC-069
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+quality_gates:
+- compila
+paths:
+- src/sdd/profile.py
+- src/sdd/profiles/agentes.yaml

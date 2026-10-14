@@ -1,7 +1,7 @@
 principles:
   - id: CONST-01
-    rule: Nenhuma aprovação do kit depende de um LLM; todo veredito vem de execução determinística.
-    enforced_by: [ARCH-003]
+    rule: Verificações e agregação rodam fora do agente; juiz LLM em evals exige política explícita e evidência marcada como probabilística.
+    enforced_by: [ARCH-003, AC-038]
   - id: CONST-02
     rule: O motor de verificação não depende da CLI e pode ser usado como biblioteca.
     enforced_by: [ARCH-001]
@@ -19,7 +19,7 @@ principles:
     enforced_by: [kit:dependencies, AC-059]
   - id: CONST-07
     rule: O kit funciona em Linux, macOS e Windows, com Python 3.10 a 3.13.
-    manual: job test do CI em 3 sistemas e 4 versões do Python, obrigatório para o merge
+    manual: CI testa Python 3.10 a 3.13 no Linux e Python 3.12 no macOS e Windows; jobs obrigatórios para o merge
   - id: CONST-08
     rule: Nenhuma leitura ou escrita depende da codificação padrão do sistema.
     manual: o CI roda os testes com EncodingWarning tratado como erro

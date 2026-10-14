@@ -55,7 +55,22 @@ principles:
     manual: decisão em decisions.yaml revisada no PR
 ```
 
-Todo princípio precisa de cobrança ou de procedimento manual, e o `check` mostra cada um
-como `COBRADO`, `VIOLADO` ou `MANUAL`. Assim fica explícito o que o projeto garante por
-ferramenta e o que depende de gente. Os IDs são `CONST-NN` (e não `C-NN`) para não colidir
+Todo princípio precisa de cobrança ou de procedimento manual. O estado descreve a
+evidência desta execução:
+
+| Estado | Significado |
+|---|---|
+| `DECLARADO` | referência válida, sem contexto de execução |
+| `PENDENTE` | verificação aplicável que este comando não executou, ou mutação de alcance parcial |
+| `APROVADO` | todas as evidências automáticas associadas passaram neste alcance |
+| `VIOLADO` | alguma evidência associada falhou |
+| `NÃO_APLICÁVEL` | o projeto não declara objeto para a verificação |
+| `MANUAL` | existe revisão humana ainda necessária |
+
+O `check` executa testes, gates e arquitetura. `kit:diff`, `kit:mutate` e `kit:eval`
+aplicáveis ficam pendentes; o comando correspondente reporta sua própria execução.
+Relatórios antigos não são usados para transformar pendência em aprovação.
+`kit:design`, `kit:tasks`, `kit:dependencies` e `kit:limits` indicam validação estrutural
+do conteúdo declarado; continuam sujeitos aos [limites semânticos](limites-e-creditos.md).
+O resultado geral de cada comando se limita ao alcance que ele verifica. Os IDs são `CONST-NN` (e não `C-NN`) para não colidir
 com o módulo Cache do perfil de agentes.

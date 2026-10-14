@@ -1,0 +1,145 @@
+feature: mutacao
+version: 2
+size: large
+summary: Medir operadores mutados numa cópia isolada e preservar o diretório original.
+assumptions:
+- assumption: linguagens alvo da mutação não foram fixadas
+  chosen: operadores textuais comuns a Python e linguagens com sintaxe C
+  rationale: cobre a maioria das stacks sem depender de parser por linguagem
+open_questions: []
+decisions:
+- AD-005
+- AD-002
+- AD-003
+- AD-004
+out_of_scope:
+- Detecção de divergência entre prosa em Markdown e código
+- Adaptadores específicos por ferramenta (AGENTS.md cobre o MVP)
+requirements:
+- id: REQ-010
+  description: Medir se os testes detectam código errado, sem LLM.
+  acceptance:
+  - id: AC-029
+    given: testes que verificam os resultados
+    when: sdd mutate roda
+    then: todos os mutantes morrem e o mutate aprova
+  - id: AC-030
+    given: testes que só executam o código sem verificar
+    when: sdd mutate roda
+    then: o mutate reprova listando cada sobrevivente com arquivo e linha
+  - id: AC-031
+    given: qualquer execução do mutate
+    when: ela termina
+    then: o diretório de trabalho fica idêntico ao de antes
+  - id: AC-032
+    given: uma suíte que já falha sem mutações
+    when: sdd mutate roda
+    then: o mutate sai com erro em vez de medir
+  - id: AC-033
+    given: operadores dentro de strings, comentários ou linhas com sdd no-mutate
+    when: os candidatos são gerados
+    then: esses trechos não são mutados
+  - id: AC-088
+    given: cópias de trabalho órfãs de execuções mortas à força no diretório temporário do sistema (sdd-mutate-*)
+    when: o mutate inicia
+    then: as cópias mais velhas que 24 h são removidas e as recentes, de execuções concorrentes, preservadas
+  - id: AC-056
+    given: um mutante que faz os testes travarem
+    when: sdd mutate roda
+    then: o mutante conta como morto por timeout
+  - id: AC-057
+    given: uma mutação que não altera o tamanho do arquivo
+    when: sdd mutate roda
+    then: os testes rodam sem bytecode em cache e cada escrita recebe um mtime novo
+  - id: AC-093
+    given: uma suíte que remove temporários de outras execuções ou apaga sua própria cópia de trabalho
+    when: sdd mutate roda
+    then: temporários dos filhos ficam isolados; cópia indisponível produz erro de execução incompleta
+      e nunca aprovação por pontuação parcial
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivo ou chamada de biblioteca
+      source: código e comando de testes
+      frequency: a cada execução do comando
+    egress:
+    - to: resultado estruturado e relatório quando aplicável
+      consumers:
+      - CLI
+      - biblioteca
+      - CI
+      freshness: imediata
+  alternatives:
+  - name: mutação textual por operadores
+    chosen: true
+    why: funciona em várias linguagens sem parser por stack
+  - name: parser e mutação específicos por linguagem
+    why_not: aumenta dependências; ferramentas dedicadas podem ser gates
+  risks:
+  - area: data_integrity
+    severity: high
+    description: teste com o ID certo no nome mas que não verifica o comportamento
+    mitigated_by:
+    - AC-029
+    - AC-030
+  - area: data_integrity
+    severity: medium
+    description: mutação textual gera mutantes equivalentes que sobrevivem sem culpa dos testes
+    accepted: marcação sdd no-mutate e min_score abaixo de 100% absorvem o ruído
+  - area: data_integrity
+    severity: high
+    description: mutate corromper o código do usuário
+    mitigated_by:
+    - AC-031
+  - area: data_integrity
+    severity: high
+    description: mutante falso sobrevivente por cache de bytecode, desacreditando a mutação
+    mitigated_by:
+    - AC-057
+  - area: other
+    severity: medium
+    description: motor acoplado à CLI impede uso como biblioteca e testes isolados
+    mitigated_by:
+    - ARCH-001
+    - ARCH-002
+  dependencies:
+  - name: suíte de testes sob mutação
+    kind: process
+    timeout_ms: 120000
+    retry:
+      max_attempts: 1
+      backoff: none
+    fallback: timeout conta como mutante morto
+    side_effects: false
+    idempotent: true
+    covered_by:
+    - AC-056
+    - AC-032
+tasks:
+- id: T-10
+  title: Medir se os testes detectam código errado, sem LLM.
+  origin:
+  - REQ-010
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-029
+  - AC-030
+  - AC-031
+  - AC-032
+  - AC-033
+  - AC-088
+  - AC-056
+  - AC-057
+  - AC-093
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+quality_gates:
+- compila
+paths:
+- src/sdd/mutation.py

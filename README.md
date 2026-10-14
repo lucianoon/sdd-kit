@@ -3,7 +3,7 @@
 [![ci](https://github.com/lucianoon/sdd-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianoon/sdd-kit/actions/workflows/ci.yml)
 
 **Specification-Driven Development para desenvolvimento assistido por IA, com verificação
-determinística.**
+por ferramentas independentes.**
 
 O agente (Claude Code, Codex, Cursor, Copilot...) escolhe **como** implementar. A spec
 define **o que** é correto. O `sdd` decide se está **pronto**, rodando fora do LLM, na sua
@@ -15,7 +15,9 @@ máquina e no CI.
 A maioria das abordagens de SDD para IA organiza prompts e templates e confia que o agente
 seguiu o processo. O sdd-kit **verifica**: cada critério precisa de um teste real passando,
 código não muda sem a spec mudar junto, testes fracos são expostos por mutação, e
-comportamento de LLM é medido com critério estatístico. Nenhuma aprovação depende de um LLM.
+comportamento de LLM é medido com critério estatístico. Checks de código usam ferramentas
+externas ao agente. Evals com juiz LLM exigem política explícita e são identificadas como
+evidência probabilística.
 
 ## Instalação
 
@@ -112,7 +114,7 @@ O `AGENTS.md` gerado ensina esse ciclo ao agente, com o que fazer e o que não f
 |---|---|
 | Comportamento mudou | spec alterada junto com o código |
 | Bug (código descumpre spec correta) | `SDD-Fix: AC-012` + teste de regressão que cite o ID |
-| Só a solução técnica mudou | `SDD-No-Spec-Change: <motivo>` |
+| Só a solução técnica mudou | `SDD-No-Spec-Change(nome-da-feature): <motivo>` |
 
 ## Documentação
 
@@ -126,8 +128,13 @@ O `AGENTS.md` gerado ensina esse ciclo ao agente, com o que fazer e o que não f
 - [Configuração](docs/configuracao.md): todas as chaves e camadas
 - [Limites, origem e créditos](docs/limites-e-creditos.md)
 
-Este repositório verifica a si mesmo: `sdd check` na raiz roda a spec do kit
-(82 critérios, constituição e regras de arquitetura próprias).
+Este repositório verifica a si mesmo com oito specs: verificação, diff, mutação, evals,
+arquitetura, governança, adoção e perfil de agentes. `sdd validate` mostra a contagem
+atual de critérios; `sdd check` roda os testes, a constituição e as regras de arquitetura.
+
+Os relatórios JSON e Markdown identificam a versão do kit, o formato e o comando.
+Princípios dependentes de comandos separados ficam `PENDENTE` no check; uma regra
+declarada não comprova execução. Veja [estados de evidência](docs/arquitetura.md).
 
 ## Licença
 

@@ -1,0 +1,127 @@
+feature: adocao
+version: 2
+size: large
+summary: Inicializar projetos, gerar specs e habilitar camadas sem sobrescrever conteúdo.
+assumptions: []
+open_questions: []
+decisions:
+- AD-005
+- AD-002
+- AD-003
+- AD-004
+out_of_scope:
+- Detecção de divergência entre prosa em Markdown e código
+- Adaptadores específicos por ferramenta (AGENTS.md cobre o MVP)
+requirements:
+- id: REQ-004
+  description: Inicializar um projeto pronto para uso.
+  acceptance:
+  - id: AC-009
+    given: um diretório vazio
+    when: sdd init roda
+    then: o projeto gerado passa em sdd validate
+- id: REQ-014
+  description: Reduzir o atrito de começar uma spec sem afrouxar a validação.
+  acceptance:
+  - id: AC-061
+    given: um projeto com specs existentes
+    when: sdd specify cria uma feature
+    then: os IDs alocados não colidem com nenhuma spec e as seções seguem o size
+  - id: AC-062
+    given: um esqueleto recém-gerado
+    when: sdd validate roda
+    then: cada campo PREENCHER é apontado com arquivo e linha, e o esqueleto preenchido valida
+- id: REQ-021
+  description: Adoção gradual — começar mínimo e ligar camadas quando fizerem sentido.
+  acceptance:
+  - id: AC-083
+    given: sdd init sem opções
+    when: o projeto é criado
+    then: surgem 4 arquivos com menos de 100 linhas no total, e o projeto valida
+  - id: AC-084
+    given: sdd init com preset padrao ou completo
+    when: o projeto é criado
+    then: as camadas do preset ficam ligadas em arquivos, config, CI e AGENTS.md, e o projeto valida
+  - id: AC-085
+    given: um projeto existente
+    when: sdd enable liga camadas
+    then: arquivos, config e seções do AGENTS.md são acrescentados uma única vez; camada inexistente é
+      erro
+    forbidden:
+    - sobrescrever arquivo existente
+    - duplicar chave ou seção ao repetir o comando
+  - id: AC-086
+    given: arquivos já existentes
+    when: sdd init roda
+    then: nenhum arquivo existente é alterado
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivo ou chamada de biblioteca
+      source: argumentos de CLI e arquivos do projeto
+      frequency: a cada execução do comando
+    egress:
+    - to: resultado estruturado e relatório quando aplicável
+      consumers:
+      - CLI
+      - biblioteca
+      - CI
+      freshness: imediata
+  alternatives:
+  - name: geração idempotente com IDs livres
+    chosen: true
+    why: preserva arquivos existentes e impede colisões
+  - name: copiar templates manualmente
+    why_not: facilita IDs duplicados e configurações divergentes
+  risks:
+  - area: other
+    severity: medium
+    description: motor acoplado à CLI impede uso como biblioteca e testes isolados
+    mitigated_by:
+    - ARCH-001
+    - ARCH-002
+  dependencies: []
+tasks:
+- id: T-04
+  title: Inicializar um projeto pronto para uso.
+  origin:
+  - REQ-004
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-009
+  status: done
+- id: T-14
+  title: Reduzir o atrito de começar uma spec sem afrouxar a validação.
+  origin:
+  - REQ-014
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-061
+  - AC-062
+  status: done
+- id: T-21
+  title: Adoção gradual — começar mínimo e ligar camadas quando fizerem sentido.
+  origin:
+  - REQ-021
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-083
+  - AC-084
+  - AC-085
+  - AC-086
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+quality_gates:
+- compila
+paths:
+- src/sdd/cli.py
+- src/sdd/scaffold.py
+- src/sdd/specify.py
+- src/sdd/layers.py
+- src/sdd/__init__.py

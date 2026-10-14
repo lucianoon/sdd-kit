@@ -309,6 +309,7 @@ def run(cmd: str, root: Path, timeout: int = 3600) -> tuple[int, str]:
 def check(proj: Project) -> dict:
     """Roda arquitetura, testes e gates e devolve o relatório. Pressupõe proj sem erros."""
     from . import arch
+    from .report import metadata
 
     cfg = proj.config
     assert cfg is not None
@@ -358,7 +359,9 @@ def check(proj: Project) -> dict:
 
     verdicts = {r["id"]: r["verdict"] for r in rows}
     violated = {v["rule"] for v in arch_report.get("violations", [])}
-    verdicts.update({rid: ("VIOLADA" if rid in violated else "OK") for rid in arch_report.get("rules", [])})
+    verdicts.update({rid: ("VIOLADA" if rid in violated else
+                          "FALHOU" if arch_report.get("problems") else "OK")
+                     for rid in arch_report.get("rules", [])})
     task_rows = []
     for spec in proj.specs.values():
         for task in spec.tasks:
@@ -372,12 +375,13 @@ def check(proj: Project) -> dict:
                               "status": task.status, "origin": task.origin, "evidence": ev})
 
     return {
+        **metadata("check"),
         "ok": not problems, "problems": problems, "criteria": rows, "gates": gates,
         "risks": risk_matrix(proj), "architecture": arch_report,
         "dependencies": dependency_matrix(proj),
         "profile": _profile_matrix(proj, rows, arch_report),
         "tasks": task_rows,
-        "constitution": _constitution_matrix(proj, rows, arch_report, gates),
+        "constitution": _constitution_matrix(proj, rows, arch_report, gates, not problems),
         "tests": {"command": cfg.tests.command, "exit_code": test_rc,
                   "output": test_out if test_rc else ""},
     }
@@ -402,21 +406,31 @@ def _profile_matrix(proj: Project, rows: list[dict], arch_report: dict) -> dict 
 
     verdicts = {r["id"]: r["verdict"] for r in rows}
     violated = {v["rule"] for v in arch_report.get("violations", [])}
-    verdicts.update({rid: ("VIOLADA" if rid in violated else "OK") for rid in arch_report.get("rules", [])})
+    verdicts.update({rid: ("VIOLADA" if rid in violated else
+                          "FALHOU" if arch_report.get("problems") else "OK")
+                     for rid in arch_report.get("rules", [])})
     return {"stage": proj.agents.stage, "requirements": matrix(proj, proj.agents, verdicts)}
 
 
-def _constitution_matrix(proj: Project, rows: list[dict], arch_report: dict, gates: list[dict]):
+def _constitution_matrix(proj: Project, rows: list[dict], arch_report: dict, gates: list[dict], ok: bool):
     if proj.constitution is None:
         return None
-    from .analysis import constitution_matrix
+    from .analysis import constitution_matrix, kit_context
 
     verdicts = {r["id"]: r["verdict"] for r in rows}
     violated = {v["rule"] for v in arch_report.get("violations", [])}
-    verdicts.update({rid: ("VIOLADA" if rid in violated else "OK") for rid in arch_report.get("rules", [])})
+    verdicts.update({rid: ("VIOLADA" if rid in violated else
+                          "FALHOU" if arch_report.get("problems") else "OK")
+                     for rid in arch_report.get("rules", [])})
     prof = _profile_matrix(proj, rows, arch_report) or {"requirements": []}
-    states = {r["id"]: r["state"] for r in prof["requirements"]}
-    return constitution_matrix(proj.constitution, verdicts, {g["gate"]: g["ok"] for g in gates}, states)
+    states = {r["id"]: ("PENDENTE" if r["state"] == "COBERTO" and
+                        any(e["verdict"] != "OK" for e in r["evidence"]) else r["state"])
+              for r in prof["requirements"]}
+    completed = {"check": "OK" if ok else "FALHOU"}
+    if arch_report.get("rules"):
+        completed["arch"] = "OK" if arch_report["ok"] else "FALHOU"
+    return constitution_matrix(proj.constitution, verdicts, {g["gate"]: g["ok"] for g in gates}, states,
+                               kit_context(proj, completed))
 
 
 def dependency_matrix(proj: Project) -> list[dict]:

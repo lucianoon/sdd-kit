@@ -23,6 +23,32 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
   PyPI por outro projeto (VS Code/Copilot). O comando `sdd`, o módulo `sdd` e a
   instalação pela fonte continuam iguais.
 
+## [0.12.0] — 2026-10-14
+
+### Adicionado
+
+- Exceções `SDD-No-Spec-Change(feature): motivo`, limitadas à feature nomeada.
+- Relatórios versionados de check, diff, mutate, eval e arch: `tool_version`,
+  `report_version: 1` e `command`; o JSON da mutação preserva a lista por feature.
+- Relatórios próprios de diff e arquitetura, com resultado e constituição.
+
+### Modificado
+
+- Constituição distingue `DECLARADO`, `PENDENTE`, `APROVADO`, `VIOLADO`,
+  `NÃO_APLICÁVEL` e `MANUAL`; referências `kit:*` não implicam execução.
+  **Migração:** consumidores que esperavam `COBRADO` devem interpretar os novos estados.
+- O trailer global reprova por padrão. Migração temporária via
+  `allow_global_diff_override: true`, com aviso de depreciação. Exceções não liberam
+  datasets alterados sem spec nem código sem dono.
+- AD-005 substitui AD-001: verificação por ferramentas e agregação determinística
+  coexistem com evidência probabilística de juiz LLM explicitamente habilitado.
+- Specs divididas em oito capacidades com paths próprios e IDs preservados;
+  tarefas obrigatórias também no próprio kit. Novos critérios AC-089 a AC-093.
+- Temporários dos filhos do mutate ficam privados à cópia; perda da cópia
+  reprova como execução incompleta mesmo com min_score baixo (AC-093).
+- Caminho temporário do mutate corrigido na spec e contagem do README substituída
+  pela contagem calculada por `sdd validate`.
+
 ## [0.11.0] — 2026-10-13
 
 ### Adicionado
