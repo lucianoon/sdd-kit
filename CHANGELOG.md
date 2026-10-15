@@ -23,6 +23,18 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
   PyPI por outro projeto (VS Code/Copilot). O comando `sdd`, o módulo `sdd` e a
   instalação pela fonte continuam iguais.
 
+## [0.13.0] — 2026-10-15
+
+### Adicionado
+
+- `sdd analyze`: diagnósticos estáticos e matriz critério → tarefa em JSON/Markdown,
+  inclusive com specs inválidas; cenários repetidos geram aviso determinístico.
+- `sdd guide <feature> --stage clarify|plan|implement|converge`: contexto para o agente,
+  sem executar comandos nem alterar arquivos. Implementação e convergência ficam
+  bloqueadas por erros estáticos; declarações não são evidência executada.
+- Instruções de adoção e documentação do fluxo inspirado no GitHub Spec Kit.
+- Feature de fluxo guiado com AC-094 a AC-099 e integração à adoção no AC-100.
+
 ## [0.12.0] — 2026-10-14
 
 ### Adicionado

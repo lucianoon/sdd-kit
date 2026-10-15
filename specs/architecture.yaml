@@ -15,6 +15,8 @@ rules:
       - src/sdd/report.py
       - src/sdd/analysis.py
       - src/sdd/layers.py
+      - src/sdd/review.py
+      - src/sdd/workflow.py
     forbid: [typer, click]
     forbid_paths: [src/sdd/cli]
   - id: ARCH-002

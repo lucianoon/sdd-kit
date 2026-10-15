@@ -1,0 +1,112 @@
+feature: fluxo-guiado
+version: 1
+size: large
+summary: Análise estática de consistência e contexto por etapa para agentes, sem aprovação implícita.
+assumptions: []
+open_questions: []
+decisions:
+- AD-005
+out_of_scope:
+- Executar LLM ou gerar respostas de clarificação automaticamente
+- Provar equivalência semântica entre prosa e implementação
+- Executar testes ou reutilizar relatórios antigos durante analyze e guide
+requirements:
+- id: REQ-023
+  description: Analisar consistência e rastreabilidade antes da implementação.
+  acceptance:
+  - id: AC-094
+    given: config ou specs inválidas e diagnósticos do carregador
+    when: sdd analyze roda
+    then: produz JSON e Markdown versionados com erros e avisos estáveis mesmo quando parte das specs
+      não carrega; erros retornam código 1
+  - id: AC-095
+    given: ACs, NFRs e EVALs, tarefas com origem em REQ e evidências declaradas
+    when: a matriz de rastreabilidade é calculada
+    then: lista cada critério com arquivo e tarefas correspondentes, expande REQ para ACs e mantém evidência
+      NÃO_EXECUTADA inclusive para tarefas done
+  - id: AC-096
+    given: cenários de aceitação iguais após normalizar caixa e espaços
+    when: a análise compara os cenários incluindo efeitos proibidos
+    then: reporta duplicação como aviso com IDs e arquivos envolvidos; cenários com efeitos proibidos
+      distintos não são agrupados
+- id: REQ-024
+  description: Fornecer contexto e instruções de trabalho por etapa para qualquer agente.
+  acceptance:
+  - id: AC-097
+    given: uma feature selecionada por nome e uma etapa clarify, plan, implement ou converge
+    when: sdd guide produz contexto em Markdown ou JSON
+    then: inclui spec completa, decisões referenciadas, constituição, arquitetura, perfil de agentes,
+      config e instruções próprias da etapa; nenhuma feature vizinha é tratada como a selecionada
+  - id: AC-098
+    given: erros no projeto, perguntas abertas e tarefas com dependências
+    when: o guia é preparado
+    then: clarify e plan permitem corrigir as specs; implement e converge ficam BLOQUEADOS por erros;
+      tarefas iniciáveis exigem dependências done e não comprovam execução
+  - id: AC-099
+    given: fontes e relatórios antigos no projeto
+    when: analyze ou guide é executado
+    then: não altera fontes nem executa comandos do projeto; guide não grava arquivos, não reutiliza evidências
+      antigas e rejeita etapa ou feature inexistente ou ambígua com código 2
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivos YAML e argumentos de CLI
+      source: specs, decisões, constituição e config do projeto
+      frequency: por chamada
+    egress:
+    - to: relatório estático ou contexto para agente
+      consumers:
+      - CLI
+      - CI
+      - agente
+      freshness: estado atual dos arquivos
+  alternatives:
+  - name: análise determinística e guia sem execução
+    chosen: true
+    why: aproveita validação existente e deixa julgamento semântico explícito no agente
+  - name: usar o agente como aprovador dos contratos
+    chosen: false
+    why_not: confunde orientação com verificação e repete o viés do implementador
+  risks:
+  - area: other
+    severity: medium
+    description: motor acoplado à CLI impede uso como biblioteca e testes isolados
+    mitigated_by:
+    - ARCH-001
+    - ARCH-002
+  dependencies: []
+tasks:
+- id: T-23
+  title: Consolidar análise estática e matriz de rastreabilidade
+  origin:
+  - REQ-023
+  done_when: AC-094 a AC-096 passam no check
+  evidence:
+  - AC-094
+  - AC-095
+  - AC-096
+  status: done
+- id: T-24
+  title: Gerar contexto por etapa sem executar comandos ou aprovar evidências
+  origin:
+  - REQ-024
+  depends_on:
+  - T-23
+  done_when: AC-097 a AC-099 passam no check
+  evidence:
+  - AC-097
+  - AC-098
+  - AC-099
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+quality_gates:
+- compila
+paths:
+- src/sdd/review.py
+- src/sdd/workflow.py

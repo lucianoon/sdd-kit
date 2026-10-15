@@ -282,10 +282,13 @@ Nenhuma decisão vive só na conversa: o que importa fica no repositório.
    "Rápido", "seguro" e "corretamente" sem número não são critério.
 3. **Ambiguidade vira pergunta.** Registre em `open_questions`; não responda sozinho.
    Lacuna resolvida por padrão vira `assumptions`, com justificativa.
+   Use `sdd guide <feature> --stage clarify` e `--stage plan` para preparar o contexto.
 4. **Testes vêm dos critérios**, não do código que você escreveu. O nome do teste contém
    o ID: `test_ac_001_...`, `it("AC-001 ...")`, `TestAC001...`.
 5. **Verifique o alcance.** Rode `sdd validate && sdd check` e cole a saída. Execute
    também diff, mutate e eval quando aplicáveis; princípios PENDENTE exigem verificação própria.
+   Antes de implementar: `sdd analyze` e `sdd guide <feature> --stage implement`.
+   Depois: `sdd guide <feature> --stage converge`; o guia não executa nem aprova verificações.
 
 ## Mudanças
 

@@ -150,6 +150,41 @@ def validate(root: Path = Root):
 
 
 @app.command()
+def analyze(
+    root: Path = Root,
+    as_json: bool = typer.Option(False, "--json", help="Emite JSON no stdout, inclusive com erros estáticos."),
+):
+    """Analisa declarações e rastreabilidade; grava .sdd/analyze.json e .md, sem rodar testes."""
+    from .report import write_command_report
+    from .review import analyze as do_analyze, render_markdown
+
+    report = do_analyze(core.load(root))
+    md = render_markdown(report)
+    write_command_report(root, "analyze", report, md)
+    typer.echo(json.dumps(report, indent=2, ensure_ascii=False) if as_json else md)
+    raise typer.Exit(0 if report["ok"] else 1)
+
+
+@app.command()
+def guide(
+    feature: str = typer.Argument(..., help="Nome exato da feature declarada na spec."),
+    stage: str = typer.Option("clarify", "--stage", help="clarify | plan | implement | converge"),
+    root: Path = Root,
+    as_json: bool = typer.Option(False, "--json", help="Emite contexto estruturado em JSON."),
+):
+    """Prepara contexto para o agente. Não grava arquivos nem executa comandos do projeto."""
+    from .workflow import build, render_markdown
+
+    try:
+        packet = build(core.load(root), feature, stage)
+    except ValueError as exc:
+        _err(str(exc))
+        raise typer.Exit(2)
+    typer.echo(json.dumps(packet, indent=2, ensure_ascii=False) if as_json else render_markdown(packet))
+    raise typer.Exit(1 if packet["status"] == "BLOQUEADO" else 0)
+
+
+@app.command()
 def check(root: Path = Root):
     """Roda testes e gates; falha se algum AC não tiver teste passando."""
     proj = _load_or_exit(root)

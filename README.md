@@ -57,6 +57,25 @@ ERRO  AC-003 (criar-pedido): SEM_TESTE
 REPROVADO — relatório em .sdd/report.md
 ```
 
+## Fluxo guiado para o agente
+
+Depois de criar a spec, prepare o contexto da feature para o agente de sua escolha:
+
+```bash
+sdd guide criar-pedido --stage clarify     # perguntas abertas e critérios a esclarecer
+sdd guide criar-pedido --stage plan        # design e tarefas rastreáveis
+sdd analyze                               # diagnósticos e matriz critério → tarefas
+sdd guide criar-pedido --stage implement   # contexto e dependências declaradas das tarefas
+sdd check
+sdd guide criar-pedido --stage converge    # instruções para revisar lacunas após implementar
+```
+
+O `guide` imprime instruções e contexto; o agente trabalha sobre eles. Não chama LLM,
+não altera arquivos nem executa testes. `analyze` preserva as fontes e grava relatórios
+estáticos em `.sdd/analyze.json` e `.md`, inclusive quando há erros. Ambos aceitam `--json`.
+Implementação e convergência ficam bloqueadas por erros estáticos; clarificação e plano
+continuam disponíveis para corrigir a spec. Veja [fluxo guiado](docs/fluxo-guiado.md).
+
 ## Adote aos poucos
 
 Comece no mínimo e ligue camadas quando fizerem sentido:
@@ -89,6 +108,8 @@ matriz com o estado real de cada evidência. Detalhes e tabela completa em
 | `sdd enable <camada>` | liga design, tasks, constitution, arch, decisions, evals, mutate, strict, agentes |
 | `sdd specify <nome>` | esqueleto de spec com IDs livres e as seções que o `--size` exige |
 | `sdd validate` | analisa specs, tarefas, constituição, perfil: órfãos, ciclos, referências, critério vago |
+| `sdd analyze` | consolida erros, avisos, cenários repetidos e matriz de rastreabilidade declarada |
+| `sdd guide <feature> --stage <etapa>` | prepara contexto para clarify, plan, implement ou converge |
 | `sdd check` | roda testes, gates e regras de arquitetura; reprova critério sem teste passando |
 | `sdd diff` | reprova código alterado sem a spec mudar junto (com exceções auditáveis) |
 | `sdd mutate` | injeta falhas no código e reprova se os testes não as detectam |
@@ -108,6 +129,9 @@ matriz com o estado real de cada evidência. Detalhes e tabela completa em
 | 5 Análise | — | `validate` |
 | 6 Implementação | código e testes | `check`, `diff`, `mutate`, `eval`, `arch` |
 
+`guide --stage converge` orienta uma revisão do agente após implementar, com lacunas
+rastreáveis e tarefas adicionais. Essa revisão não substitui os comandos de verificação.
+
 O `AGENTS.md` gerado ensina esse ciclo ao agente, com o que fazer e o que não fazer.
 
 | Mudança | No commit |
@@ -121,6 +145,7 @@ O `AGENTS.md` gerado ensina esse ciclo ao agente, com o que fazer e o que não f
 - [Changelog](CHANGELOG.md): o que mudou em cada versão
 - [Especificação](docs/especificacao.md): specs, rastreio, convenções por stack, size, premissas, tarefas
 - [Verificação contínua](docs/verificacao.md): `diff`, `SDD-Fix`, `mutate`
+- [Fluxo guiado](docs/fluxo-guiado.md): `analyze`, contexto por etapa e limites da convergência
 - [Desenho arquitetural](docs/design.md): números, alternativas, riscos, modos de falha
 - [Arquitetura e constituição](docs/arquitetura.md): `arch`, princípios executáveis
 - [Comportamento de LLM](docs/evals.md): `eval`, intervalo de confiança, juiz LLM
@@ -128,8 +153,8 @@ O `AGENTS.md` gerado ensina esse ciclo ao agente, com o que fazer e o que não f
 - [Configuração](docs/configuracao.md): todas as chaves e camadas
 - [Limites, origem e créditos](docs/limites-e-creditos.md)
 
-Este repositório verifica a si mesmo com oito specs: verificação, diff, mutação, evals,
-arquitetura, governança, adoção e perfil de agentes. `sdd validate` mostra a contagem
+Este repositório verifica a si mesmo com nove specs: verificação, diff, mutação, evals,
+arquitetura, governança, adoção, perfil de agentes e fluxo guiado. `sdd validate` mostra a contagem
 atual de critérios; `sdd check` roda os testes, a constituição e as regras de arquitetura.
 
 Os relatórios JSON e Markdown identificam a versão do kit, o formato e o comando.

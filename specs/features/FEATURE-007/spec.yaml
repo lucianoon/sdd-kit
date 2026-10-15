@@ -1,5 +1,5 @@
 feature: adocao
-version: 2
+version: 3
 size: large
 summary: Inicializar projetos, gerar specs e habilitar camadas sem sobrescrever conteúdo.
 assumptions: []
@@ -54,6 +54,14 @@ requirements:
     given: arquivos já existentes
     when: sdd init roda
     then: nenhum arquivo existente é alterado
+- id: REQ-025
+  description: Expor análise e fluxo guiado na CLI e instruções de adoção.
+  acceptance:
+  - id: AC-100
+    given: um projeto inicializado e a CLI instalada
+    when: os comandos e instruções são consultados
+    then: analyze e guide estão disponíveis em Markdown ou JSON e AGENTS.md orienta análise antes de implementar
+      e convergência após implementar
 design:
   numbers:
   - metric: specs por projeto
@@ -114,6 +122,14 @@ tasks:
   - AC-084
   - AC-085
   - AC-086
+  status: done
+- id: T-25
+  title: Integrar análise e guia à CLI e adoção
+  origin:
+  - REQ-025
+  done_when: AC-100 passa no check
+  evidence:
+  - AC-100
   status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.

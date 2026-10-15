@@ -39,8 +39,8 @@ O que o kit não garante, de onde vieram as ideias e o que vem depois.
   reordenação de chaves não contam. O revisor ainda confere se a edição descreve a mudança.
   O trailer de exceção é limitado à feature nomeada; ainda vale para o intervalo inteiro
   daquela feature. O formato global exige opt-in de migração e emite aviso.
-- Sem orçamento de autonomia executável (hoje é texto na constituição) e sem
-  `specify`/`plan` assistidos.
+- Sem orçamento de autonomia executável (hoje é texto na constituição). O `guide`
+  prepara contexto por etapa, mas não inicia agente, gera respostas ou executa o plano.
 
 ## O que veio da TLC Spec-Driven
 
@@ -67,10 +67,15 @@ agente, não verificação). Elas combinam bem com o sdd-kit se você usar a ski
 3. Associar exceções a arquivos ou commits específicos dentro da feature; hoje o alcance
    é o intervalo da feature nomeada.
 
-Este repositório se verifica: `sdd check` na raiz roda as oito specs de capacidades em
+Este repositório se verifica: `sdd check` na raiz roda as nove specs de capacidades em
 `specs/features/FEATURE-*/spec.yaml`.
 
 ## Créditos
+
+Análise com rastreabilidade e orientação por etapas de clarificação, plano, implementação
+e convergência foram inspiradas pelo [GitHub Spec Kit](https://github.com/github/spec-kit).
+O sdd-kit implementa seu próprio analisador estático e gerador de contexto, sem copiar
+templates nem adotar o agente como aprovador dos contratos; veja [fluxo guiado](fluxo-guiado.md).
 
 O ciclo de sete etapas, as tarefas rastreáveis, a constituição com IDs e o tratamento de
 mudanças vêm do *Guia SDD para Agentes de IA* (Luciano Oliveira Nunes), baseado no vídeo
