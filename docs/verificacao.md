@@ -36,6 +36,10 @@ sdd diff --base origin/main
 Compara com o merge-base da branch alvo, incluindo alterações não commitadas e arquivos
 não rastreados.
 
+A listagem do Git usa separação por NUL (`-z`): nomes com acentos, espaços, aspas ou
+caracteres de controle permitidos pelo sistema são preservados, inclusive com
+`core.quotePath` ativo. Esses nomes passam pelas mesmas regras de propriedade e spec.
+
 | Situação | Resultado |
 |---|---|
 | Arquivo em `paths` de uma feature mudou e a pasta da spec não | **reprova** |

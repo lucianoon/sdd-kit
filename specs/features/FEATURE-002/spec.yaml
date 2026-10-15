@@ -1,5 +1,5 @@
 feature: diff
-version: 2
+version: 3
 size: large
 summary: Cobrar alterações de contrato por feature e exceções auditáveis com alcance explícito.
 assumptions: []
@@ -40,6 +40,10 @@ requirements:
     given: alterações não commitadas e arquivos não rastreados
     when: sdd diff roda
     then: essas alterações entram na avaliação
+  - id: AC-101
+    given: arquivos rastreados ou novos com acentos, espaços e caracteres de controle permitidos pelo sistema
+    when: o Git lista as mudanças para sdd diff
+    then: os nomes são preservados integralmente e alterações sem spec reprovam, inclusive quando core.quotePath está ativo
   - id: AC-087
     given: edição na spec que não muda o conteúdo (só comentário, espaço em branco ou ordem de chaves)
     when: sdd diff roda
@@ -122,6 +126,7 @@ tasks:
   - AC-013
   - AC-014
   - AC-015
+  - AC-101
   - AC-087
   - AC-054
   - AC-090

@@ -4,6 +4,7 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -191,6 +192,49 @@ def test_mean_score(tmp_path):
     rep = run_eval(project(tmp_path, ev, plan=lines_for([0.8, 0.75, 0.7], field="score")))
     row = rep["evals"][0]
     assert row["verdict"] == "OK" and row["value"] == 0.75 and "ci95" not in row
+
+
+@pytest.mark.parametrize("score", [float("nan"), float("inf"), float("-inf"), True, False, None, "0.99", 10 ** 400])
+def test_ac_102_score_invalido_reprova_sem_agregado(tmp_path, score):
+    result = tmp_path / "results.jsonl"
+    result.write_text(json.dumps({"case": "c0", "run": 1, "score": score}) + "\n", encoding="utf-8")
+    ev = Eval(**ev_with(aggregate="mean_score", runs=1, min_cases=1))
+    row = evals.evaluate("agente", ev, {"c0"}, result)
+    assert row["verdict"] == "INCOMPLETO", row
+    assert "score" in row["detail"] and "linha 1" in row["detail"]
+    assert "value" not in row and "run_values" not in row
+    json.dumps(row, allow_nan=False)
+
+
+def test_ac_102_nan_na_cli_reprova_e_grava_json_valido(tmp_path):
+    ev = ev_with(aggregate="mean_score", runs=1, min_cases=1)
+    project(tmp_path, ev, plan=[{"case": "c0", "run": 1, "score": float("nan")}])
+    result = runner.invoke(app, ["eval", "-C", str(tmp_path)])
+    assert result.exit_code == 1, result.output
+    report = json.loads((tmp_path / ".sdd/eval.json").read_text(encoding="utf-8"))
+    assert not report["ok"] and report["evals"][0]["verdict"] == "INCOMPLETO"
+    json.dumps(report, allow_nan=False)
+
+
+@pytest.mark.parametrize("scores", [[1e308, 1e308], [-1e308, 1e308]])
+def test_ac_102_agregacao_nao_finita_reprova(tmp_path, scores):
+    result = tmp_path / "results.jsonl"
+    result.write_text("".join(json.dumps({"case": f"c{i}", "run": i + 1, "score": v}) + "\n"
+                              for i, v in enumerate(scores)), encoding="utf-8")
+    ev = Eval(**ev_with(aggregate="mean_score", runs=2, min_cases=1))
+    row = evals.evaluate("agente", ev, {"c0", "c1"}, result)
+    assert row["verdict"] == "INCOMPLETO", row
+    assert "agregação" in row["detail"] and "value" not in row
+
+
+@pytest.mark.parametrize("score", [0, 1, -2, 0.95, -0.5])
+def test_ac_102_scores_finitos_continuam_avaliados(tmp_path, score):
+    result = tmp_path / "results.jsonl"
+    result.write_text(json.dumps({"case": "c0", "run": 1, "score": score}) + "\n", encoding="utf-8")
+    ev = Eval(**ev_with(aggregate="mean_score", runs=1, min_cases=1, threshold={"min": 0.9}))
+    row = evals.evaluate("agente", ev, {"c0"}, result)
+    assert row["verdict"] == ("OK" if score >= 0.9 else "FORA_DO_LIMITE")
+    assert row["value"] == score
 
 
 def test_harness_quebrado_reprova(tmp_path):

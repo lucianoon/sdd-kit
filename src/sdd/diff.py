@@ -43,7 +43,7 @@ def _glob_regex(pattern: str) -> re.Pattern:
             out, i = out + "[^/]", i + 1
         else:
             out, i = out + re.escape(pattern[i]), i + 1
-    return re.compile(f"^{out}$")
+    return re.compile(f"^{out}\\Z", re.DOTALL)
 
 
 def matches(path: str, patterns: list[str]) -> bool:
@@ -52,22 +52,23 @@ def matches(path: str, patterns: list[str]) -> bool:
 
 def _git(root: Path, *args: str) -> str:
     try:
-        # encoding já liga o modo texto
-        p = subprocess.run(["git", *args], cwd=root, capture_output=True,
-                           encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT)
+        # Preserve CR/LF em nomes de arquivo: o modo texto normalizaria esses bytes.
+        p = subprocess.run(["git", *args], cwd=root, capture_output=True, timeout=GIT_TIMEOUT)
     except subprocess.TimeoutExpired:
         raise GitError(f"git {' '.join(args)}: excedeu {GIT_TIMEOUT}s")
     if p.returncode != 0:
-        raise GitError(f"git {' '.join(args)}: {p.stderr.strip()}")
-    return p.stdout
+        raise GitError(f"git {' '.join(args)}: {p.stderr.decode('utf-8', errors='replace').strip()}")
+    return p.stdout.decode("utf-8", errors="replace")
 
 
 def changes(root: Path, base: str) -> tuple[list[str], str, str]:
     """Arquivos alterados desde o merge-base com `base` (inclui não commitados e
     não rastreados), as mensagens de commit do intervalo e o merge-base."""
     mb = _git(root, "merge-base", base, "HEAD").strip()
-    files = set(_git(root, "diff", "--name-only", mb).split())
-    files |= set(_git(root, "ls-files", "--others", "--exclude-standard").split())
+    # -z evita quoting do Git e separa nomes sem quebrar espaços, tabs ou novas linhas.
+    files = set(_git(root, "diff", "--name-only", "-z", mb).split("\0"))
+    files |= set(_git(root, "ls-files", "--others", "--exclude-standard", "-z").split("\0"))
+    files.discard("")
     messages = _git(root, "log", "--format=%B", f"{mb}..HEAD")
     return sorted(files), messages, mb
 

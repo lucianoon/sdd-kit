@@ -1,5 +1,5 @@
 feature: evals
-version: 2
+version: 3
 size: large
 summary: Agregar resultados de comportamento com critérios estatísticos e política explícita para juiz
   LLM.
@@ -29,6 +29,10 @@ requirements:
     given: execuções ou casos insuficientes, caso fora do dataset ou caso duplicado
     when: sdd eval roda
     then: o eval reprova como INCOMPLETO apontando o motivo
+  - id: AC-102
+    given: mean_score com NaN, infinito, booleano, valor não numérico ou agregação não finita
+    when: sdd eval processa os resultados
+    then: reprova como INCOMPLETO com motivo explícito e sem gravar agregados não finitos; scores finitos permanecem avaliados pelos limites
   - id: AC-037
     given: variação entre execuções acima de max_run_spread
     when: sdd eval roda
@@ -143,6 +147,7 @@ tasks:
   - AC-034
   - AC-035
   - AC-036
+  - AC-102
   - AC-037
   - AC-038
   - AC-039

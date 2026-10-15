@@ -6,7 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from sdd.cli import app
-from sdd.diff import matches
+from sdd.diff import changes, matches
 
 runner = CliRunner()
 
@@ -167,6 +167,35 @@ def test_ac_015_nao_commitado_e_nao_rastreado_contam(repo):
     assert run_diff(repo).exit_code == 1
 
 
+@pytest.mark.parametrize("name", ["validação.py", "com espaço.py", 'com"aspas.py', "com\ttab.py", "com\nlinha.py", "com\rretorno.py"])
+@pytest.mark.parametrize("state", ["modified", "staged", "untracked"])
+def test_ac_101_nomes_especiais_preservados_e_cobrados(repo, name, state):
+    if os.name == "nt" and any(c in name for c in '\"\t\n\r'):
+        pytest.skip("nome não permitido no Windows")
+    git(repo, "config", "core.quotePath", "true")
+    path = f"src/pedidos/{name}"
+    if state != "untracked":
+        write(repo, path, "x = 1\n")
+        commit(repo, "arquivo de base")
+    write(repo, path, "x = 2\n")
+    if state == "staged":
+        git(repo, "add", "--", path)
+    changed, _, _ = changes(repo, "HEAD")
+    assert changed == [path]
+    result = runner.invoke(app, ["diff", "--base", "HEAD", "-C", str(repo)])
+    assert result.exit_code == 1, result.output
+    assert "pedidos: código alterado sem mudança" in result.stderr
+
+
+def test_ac_101_arquivo_unicode_sem_dono_reprova(repo):
+    git(repo, "config", "core.quotePath", "true")
+    write(repo, "src/órfão com espaço.py", "x = 2\n")
+    commit(repo)
+    result = run_diff(repo)
+    assert result.exit_code == 1
+    assert "src/órfão com espaço.py: código sem feature dona" in result.stderr
+
+
 def test_arquivo_fora_de_code_e_ignorado(repo):
     write(repo, "README.md", "outro\n")
     commit(repo)
@@ -243,6 +272,8 @@ def test_ac_087_spec_removida_do_disco_e_mudanca_real(repo):
     ("src/a1.py", "src/a?.py", True),
     ("src/a12.py", "src/a?.py", False),
     ("src/a/.py", "src/a?.py", False),
+    ("src/com\nlinha.py", "src/**", True),
+    ("src/api.py\n", "src/api.py", False),
 ])
 def test_glob(path, pattern, ok):
     assert matches(path, [pattern]) is ok

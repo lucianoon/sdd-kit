@@ -37,8 +37,13 @@ evals:
 | `OK` | dentro do limite e estável |
 | `FORA_DO_LIMITE` | média (ou limite do IC 95%) fora de `threshold` |
 | `INSTAVEL` | maior − menor valor entre execuções acima de `max_run_spread` |
-| `INCOMPLETO` | menos execuções ou casos que o exigido, caso fora do dataset, caso duplicado |
+| `INCOMPLETO` | menos execuções ou casos que o exigido, caso fora do dataset, caso duplicado, score inválido ou agregação não finita |
 | `SEM_RESULTADO` | harness não gravou o arquivo (resultados antigos são apagados antes) |
+
+Com `mean_score`, cada `score` deve ser um número finito: `NaN`, infinitos,
+booleanos, strings e valores ausentes reprovam. Se a soma ou a variação produzir um
+valor não finito por overflow, a eval também reprova como `INCOMPLETO`, sem publicar
+agregados inválidos. Scores finitos seguem a escala da métrica e os limites da spec.
 
 ```
 $ sdd eval

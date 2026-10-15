@@ -35,6 +35,13 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 - Instruções de adoção e documentação do fluxo inspirado no GitHub Spec Kit.
 - Feature de fluxo guiado com AC-094 a AC-099 e integração à adoção no AC-100.
 
+### Corrigido
+
+- `diff` preserva nomes com acentos, espaços e caracteres de controle ao consumir
+  saídas Git separadas por NUL, impedindo aprovações indevidas por caminhos escapados (AC-101).
+- `eval` reprova scores NaN, infinitos, booleanos e valores não numéricos, além de
+  agregações não finitas, como `INCOMPLETO`; não grava agregados inválidos (AC-102).
+
 ## [0.12.0] — 2026-10-14
 
 ### Adicionado

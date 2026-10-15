@@ -37,6 +37,13 @@ def _row(spec_feature: str, ev: Eval, verdict: str, detail: str = "", **extra) -
             "verdict": verdict, "detail": detail, **extra}
 
 
+def _finite_score(value) -> bool:
+    try:
+        return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+    except OverflowError:  # inteiros que não cabem no float usado na agregação
+        return False
+
+
 def evaluate(feature: str, ev: Eval, known: set[str], results: Path) -> dict:
     if not results.is_file():
         return _row(feature, ev, "SEM_RESULTADO", f"harness não gerou {results.name}")
@@ -56,8 +63,9 @@ def evaluate(feature: str, ev: Eval, known: set[str], results: Path) -> dict:
             return _row(feature, ev, "INCOMPLETO", f"caso '{case}' duplicado na execução {run}")
         if ev.aggregate == "pass_rate" and not isinstance(r.get("pass"), bool):
             return _row(feature, ev, "INCOMPLETO", f"linha {n}: 'pass' deve ser true/false")
-        if ev.aggregate == "mean_score" and not isinstance(r.get("score"), (int, float)):
-            return _row(feature, ev, "INCOMPLETO", f"linha {n}: 'score' numérico ausente")
+        if ev.aggregate == "mean_score" and not _finite_score(r.get("score")):
+            return _row(feature, ev, "INCOMPLETO",
+                        f"linha {n}: 'score' deve ser número finito, sem booleanos")
         per_run[run][case] = r
 
     if len(per_run) < ev.runs:
@@ -72,6 +80,8 @@ def evaluate(feature: str, ev: Eval, known: set[str], results: Path) -> dict:
                   for run, cases in sorted(per_run.items())}
     value = sum(run_values.values()) / len(run_values)
     spread = max(run_values.values()) - min(run_values.values())
+    if not all(math.isfinite(v) for v in [*run_values.values(), value, spread]):
+        return _row(feature, ev, "INCOMPLETO", "agregação de 'score' produziu valor não finito")
     extra = {"value": round(value, 4), "spread": round(spread, 4), "runs": len(run_values),
              "cases_per_run": min(len(c) for c in per_run.values()),
              "run_values": {str(k): round(v, 4) for k, v in run_values.items()}}
