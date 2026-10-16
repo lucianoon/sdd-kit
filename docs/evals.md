@@ -45,6 +45,14 @@ booleanos, strings e valores ausentes reprovam. Se a soma ou a variação produz
 valor não finito por overflow, a eval também reprova como `INCOMPLETO`, sem publicar
 agregados inválidos. Scores finitos seguem a escala da métrica e os limites da spec.
 
+Os limites configurados (`threshold.min/max`, `max_run_spread`) também precisam ser
+finitos. JSONL com chaves duplicadas é inválido; `run` deve ser inteiro positivo,
+sem coerção de string, float ou booleano. Arquivo ilegível retorna `INCOMPLETO`.
+
+`evals.results_dir` fica dentro do projeto, fora de fontes/specs/datasets e sem links
+simbólicos. Antes do harness, apenas os JSONL dos EVALs declarados são removidos;
+arquivos vizinhos permanecem. Caminho inseguro reprova antes de executar o harness.
+
 ```
 $ sdd eval
 OK              EVAL-001  tool_selection_accuracy = 0.913

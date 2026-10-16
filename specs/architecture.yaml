@@ -17,6 +17,9 @@ rules:
       - src/sdd/layers.py
       - src/sdd/review.py
       - src/sdd/workflow.py
+      - src/sdd/project.py
+      - src/sdd/artifacts.py
+      - src/sdd/evidence.py
     forbid: [typer, click]
     forbid_paths: [src/sdd/cli]
   - id: ARCH-002
@@ -28,3 +31,14 @@ rules:
     description: O kit agrega evidências sem importar SDK de modelo; juiz LLM fica no harness externo (AD-005)
     from: ["src/sdd/**"]
     forbid: [openai, anthropic, "langchain*", "langgraph*", litellm, google.generativeai, "google.genai", cohere, mistralai, ollama]
+
+  - id: ARCH-004
+    description: Carregamento e schema não dependem do executor de comandos
+    from: [src/sdd/project.py, src/sdd/models.py]
+    forbid: [subprocess, shutil, typer, click]
+    forbid_paths: [src/sdd/core, src/sdd/procs, src/sdd/evals, src/sdd/mutation, src/sdd/cli]
+  - id: ARCH-005
+    description: Interpretação de evidências não executa comandos nem conhece a CLI
+    from: [src/sdd/evidence.py]
+    forbid: [subprocess, shutil, typer, click]
+    forbid_paths: [src/sdd/core, src/sdd/procs, src/sdd/cli]

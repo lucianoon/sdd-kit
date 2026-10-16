@@ -1,0 +1,73 @@
+feature: artefatos
+version: 1
+size: large
+summary: Proteger leitura de dados e gravação de evidências dentro do projeto.
+assumptions: []
+open_questions: []
+decisions:
+- AD-005
+- AD-006
+out_of_scope:
+- Sandbox para executar código hostil
+- Garantia de isolamento de comandos autorizados pelo operador
+requirements:
+- id: REQ-031
+  description: Confinar artefatos e limpeza de resultados ao projeto.
+  acceptance:
+  - id: AC-111
+    given: diretório .sdd ou destino de relatório como link para arquivo externo
+    when: analyze ou outro comando grava relatório
+    then: recusa caminho inseguro ou substitui apenas o link sem seguir o alvo; gravação normal é atômica
+      e não emite JSON não finito
+  - id: AC-112
+    given: results_dir absoluto, com traversal, symlink, raiz ou pasta que contém specs, fontes ou dataset
+    when: a eval prepara resultados
+    then: reprova antes de apagar arquivos ou executar o harness e preserva todos os arquivos protegidos
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivos e caminhos relativos
+      source: configuração e consumidores internos
+      frequency: por operação de IO
+    egress:
+    - to: dados validados ou artefatos dentro do projeto
+      consumers:
+      - carregador
+      - relatórios
+      - evals
+      freshness: gravação atômica por arquivo
+  alternatives:
+  - name: Descritores de diretório POSIX e substituição atômica
+    chosen: true
+    why: centraliza proteção de caminhos, não segue links e impede relatórios parcialmente gravados
+  - name: Gravar diretamente em caminhos concatenados
+    why_not: links fornecidos pelo repositório podem redirecionar gravação para arquivos externos
+  risks:
+  - area: data_integrity
+    severity: high
+    description: link simbólico redirecionar gravação ou limpeza para fora do projeto
+    mitigated_by:
+    - AC-111
+    - AC-112
+  dependencies: []
+tasks:
+- id: T-31
+  title: Confinar artefatos e limpeza
+  origin:
+  - REQ-031
+  done_when: AC-111 e AC-112 passam no check
+  evidence:
+  - AC-111
+  - AC-112
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+quality_gates:
+- compila
+paths:
+- src/sdd/artifacts.py

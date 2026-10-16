@@ -1,5 +1,5 @@
 feature: diff
-version: 3
+version: 4
 size: large
 summary: Cobrar alterações de contrato por feature e exceções auditáveis com alcance explícito.
 assumptions: []
@@ -41,9 +41,11 @@ requirements:
     when: sdd diff roda
     then: essas alterações entram na avaliação
   - id: AC-101
-    given: arquivos rastreados ou novos com acentos, espaços e caracteres de controle permitidos pelo sistema
+    given: arquivos rastreados ou novos com acentos, espaços e caracteres de controle permitidos pelo
+      sistema
     when: o Git lista as mudanças para sdd diff
-    then: os nomes são preservados integralmente e alterações sem spec reprovam, inclusive quando core.quotePath está ativo
+    then: os nomes são preservados integralmente e alterações sem spec reprovam, inclusive quando core.quotePath
+      está ativo
   - id: AC-087
     given: edição na spec que não muda o conteúdo (só comentário, espaço em branco ou ordem de chaves)
     when: sdd diff roda
@@ -59,6 +61,11 @@ requirements:
     when: sdd diff roda
     then: o diff reprova; o formato global legado só libera código com allow_global_diff_override ativo
       e aviso de depreciação
+  - id: AC-114
+    given: conteúdo YAML literal iniciado por cerquilha ou documento atípico
+    when: o diff compara o conteúdo das specs
+    then: preserva mudanças em strings literais e não lança traceback ao comparar documento de estrutura
+      inválida
 - id: REQ-020
   description: Correção de bug sem mudar a spec, comprovada por teste de regressão.
   acceptance:
@@ -130,6 +137,7 @@ tasks:
   - AC-087
   - AC-054
   - AC-090
+  - AC-114
   status: done
 - id: T-20
   title: Correção de bug sem mudar a spec, comprovada por teste de regressão.

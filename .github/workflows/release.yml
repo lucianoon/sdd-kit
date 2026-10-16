@@ -3,6 +3,8 @@
 #   PyPI project name: sdd-kit-ai
 #   Owner: lucianoon · Repository: sdd-kit · Workflow: release.yml · Environment: pypi
 name: release
+permissions:
+  contents: read
 on:
   push:
     tags: ["v*"]
@@ -14,8 +16,15 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with: { python-version: "3.12" }
-      - run: pip install -U build twine
+      - run: pip install -e ".[dev]" twine
+      - name: Conferir tag e versão
+        run: python -c "import os; from sdd import __version__; assert os.environ['GITHUB_REF_NAME'] == 'v' + __version__, 'tag difere da versão do pacote'"
+      - run: sdd validate
+      - run: sdd check
       - run: python -m build
+      - name: Smoke do pacote instalado
+        shell: bash
+        run: python scripts/smoke_dist.py dist/*.whl
       # Falha antes de publicar com metadados quebrados (licença, readme, name...).
       - run: twine check dist/*
       - uses: actions/upload-artifact@v4

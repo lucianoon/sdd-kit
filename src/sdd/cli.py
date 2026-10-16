@@ -4,11 +4,22 @@ import json
 from pathlib import Path
 
 import typer
+from typer.core import TyperGroup
 
 from . import core
 from .models import Spec
+from .artifacts import ArtifactError
 
-app = typer.Typer(add_completion=False, no_args_is_help=True,
+
+class SafeGroup(TyperGroup):
+    def invoke(self, ctx):
+        try:
+            return super().invoke(ctx)
+        except ArtifactError as exc:
+            _err(str(exc))
+            raise typer.Exit(2)
+
+app = typer.Typer(cls=SafeGroup, add_completion=False, no_args_is_help=True,
                   help="SDD agnóstico: specs como contrato, verificação fora do LLM.")
 Root = typer.Option(Path("."), "--root", "-C", help="Raiz do projeto.")
 
@@ -338,7 +349,8 @@ def arch_cmd(root: Path = Root):
 
     proj = _load_or_exit(root)
     rep = arch.check(proj)
-    verdicts = {rid: "OK" if rep["ok"] else "VIOLADA" for rid in rep["rules"]}
+    from .evidence import architecture_verdicts
+    verdicts = architecture_verdicts(rep)
     rep["constitution"] = _constitution(proj, "arch", rep["ok"], verdicts)
     write_command_report(root, "arch", rep, arch.render_markdown(rep))
     if not rep["rules"]:

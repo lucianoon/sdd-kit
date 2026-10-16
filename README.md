@@ -12,8 +12,8 @@ máquina e no CI.
 > LLMs propõem e implementam. Especificações definem os contratos.
 > Ferramentas independentes verificam. Humanos governam as decisões de maior risco.
 
-A maioria das abordagens de SDD para IA organiza prompts e templates e confia que o agente
-seguiu o processo. O sdd-kit **verifica**: cada critério precisa de um teste real passando,
+O sdd-kit combina orientação ao agente com verificação executável: cada critério precisa
+de um teste identificado passando,
 código não muda sem a spec mudar junto, testes fracos são expostos por mutação, e
 comportamento de LLM é medido com critério estatístico. Checks de código usam ferramentas
 externas ao agente. Evals com juiz LLM exigem política explícita e são identificadas como
@@ -104,7 +104,7 @@ matriz com o estado real de cada evidência. Detalhes e tabela completa em
 
 | Comando | O que faz |
 |---|---|
-| `sdd init` | cria a estrutura (nunca sobrescreve) |
+| `sdd init` | preserva arquivos iniciais existentes e aplica as camadas do preset escolhido |
 | `sdd enable <camada>` | liga design, tasks, constitution, arch, decisions, evals, mutate, strict, agentes |
 | `sdd specify <nome>` | esqueleto de spec com IDs livres e as seções que o `--size` exige |
 | `sdd validate` | analisa specs, tarefas, constituição, perfil: órfãos, ciclos, referências, critério vago |
@@ -148,13 +148,15 @@ O `AGENTS.md` gerado ensina esse ciclo ao agente, com o que fazer e o que não f
 - [Fluxo guiado](docs/fluxo-guiado.md): `analyze`, contexto por etapa e limites da convergência
 - [Desenho arquitetural](docs/design.md): números, alternativas, riscos, modos de falha
 - [Arquitetura e constituição](docs/arquitetura.md): `arch`, princípios executáveis
+- [Arquitetura interna](docs/arquitetura-interna.md): módulos, proteção de IO e testes da distribuição
+- [Auditoria de outubro de 2026](docs/auditoria-2026-10.md): achado corrigido, alcance, validação e limites
 - [Comportamento de LLM](docs/evals.md): `eval`, intervalo de confiança, juiz LLM
 - [Perfil de agentes](docs/agentes.md): matriz de módulos, requisitos críticos, LGPD
 - [Configuração](docs/configuracao.md): todas as chaves e camadas
 - [Limites, origem e créditos](docs/limites-e-creditos.md)
 
-Este repositório verifica a si mesmo com nove specs: verificação, diff, mutação, evals,
-arquitetura, governança, adoção, perfil de agentes e fluxo guiado. `sdd validate` mostra a contagem
+Este repositório verifica a si mesmo com dez specs: verificação, diff, mutação, evals,
+arquitetura, governança, adoção, perfil de agentes, fluxo guiado e artefatos. `sdd validate` mostra a contagem
 atual de critérios; `sdd check` roda os testes, a constituição e as regras de arquitetura.
 
 Os relatórios JSON e Markdown identificam a versão do kit, o formato e o comando.

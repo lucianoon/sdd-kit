@@ -23,6 +23,37 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
   PyPI por outro projeto (VS Code/Copilot). O comando `sdd`, o módulo `sdd` e a
   instalação pela fonte continuam iguais.
 
+## [0.14.0] — 2026-10-15
+
+### Adicionado
+
+- Módulo `project` para carregamento sem execução, `artifacts` para IO protegido e
+  `evidence` para interpretação comum de resultados por regra (AD-006).
+- Verificação de imports Python por AST e resultado por regra; erros de leitura ou
+  sintaxe reprovam a análise. Novas regras ARCH-004 e ARCH-005 protegem o carregador.
+- Teste do wheel instalado fora do checkout e smoke de CLI, catálogo, analyze e guide.
+- Registro de auditoria com alcance explícito, regressões e limites em `docs/auditoria-2026-10.md`.
+- CI inclui Python 3.14 e análise estática; release exige tag igual à versão e testes
+  antes da publicação. Permissão padrão de workflows limitada a leitura.
+
+### Corrigido
+
+- Escrita de relatórios não segue links simbólicos fornecidos pelo checkout; gravação
+  atômica por arquivo, compartilhada com geração e atualização de arquivos.
+- Todos os números de contratos precisam ser finitos, inclusive thresholds e custos.
+- YAML/JSON rejeitam chaves duplicadas; JSONL exige run inteiro positivo e trata IO inválido.
+- Evals não apagam recursivamente o results_dir; limpam somente artefatos declarados e
+  recusam diretórios que põem fontes, specs ou datasets em risco.
+- Mutação recusa alvos resolvidos fora da cópia, inclusive durante a restauração.
+- Comparação YAML preserva cerquilhas dentro de strings literais e tolera documentos atípicos.
+
+### Migração
+
+- `core.load` e `core.Project` permanecem compatíveis. Caminhos de artefatos e datasets
+  devem ser relativos ao projeto; limites infinitos e configurações ambíguas agora reprovam.
+- `rule_results` acrescenta evidência por regra ao relatório existente; comandos e
+  estados principais permanecem. Copiar o projeto não constitui sandbox de comandos.
+
 ## [0.13.0] — 2026-10-15
 
 ### Adicionado

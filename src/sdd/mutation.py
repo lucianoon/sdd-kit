@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .core import Project
+from .project import Project
 from .diff import matches
 from .procs import run_shell
 from .textscan import python_string_lines
@@ -252,6 +252,10 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
     work = _copy_project(proj.root, cfg.link)
     clock = _Clock()
     try:
+        if any(not (work / m.file).resolve().is_relative_to(work.resolve()) for m in rep.mutants):
+            rep.error = "alvo de mutação fora da cópia (symlink ou dependência compartilhada)"
+            rep.mutants = []
+            return rep
         env = {**os.environ, **{k: v.replace("{root}", str(work)) for k, v in cfg.env.items()}}
         private_tmp = work / ".sdd-tmp"
         private_tmp.mkdir()
@@ -266,6 +270,9 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
             return rep
         for m in rep.mutants:
             target = work / m.file
+            if not target.resolve().is_relative_to(work.resolve()):
+                rep.error = "alvo de mutação fora da cópia após execução dos testes"
+                break
             try:
                 original = _read(target)
             except OSError:
@@ -279,6 +286,8 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
                 result = _run(cmd, work, env, cfg.timeout)
             finally:
                 try:
+                    if not target.resolve().is_relative_to(work.resolve()):
+                        raise OSError("restauração recusada: alvo fora da cópia")
                     _write(target, original, clock)
                 except OSError:
                     rep.error = "cópia de trabalho indisponível; execução de mutação incompleta"

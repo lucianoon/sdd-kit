@@ -11,7 +11,8 @@ from pathlib import Path
 
 import yaml
 
-from .core import CONFIG_PATH, PLACEHOLDER
+from .project import CONFIG_PATH, PLACEHOLDER
+from .artifacts import atomic_write, confined, load_yaml
 
 ID_ANY = re.compile(r"\b(REQ|AC|NFR|EVAL)-(\d{3,})\b")
 NAME_OK = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -46,9 +47,12 @@ def _config(root: Path) -> dict:
     if not cfg_file.exists():
         return {}
     try:
-        return yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError:
-        return {}
+        cfg = load_yaml(cfg_file) or {}
+        if not isinstance(cfg, dict):
+            raise SpecifyError("configuração precisa ser um mapa YAML")
+        return cfg
+    except (yaml.YAMLError, OSError, UnicodeError) as exc:
+        raise SpecifyError(f"{CONFIG_PATH}: configuração ilegível: {exc}") from exc
 
 
 def _tasks_required(root: Path, size: str) -> bool:
@@ -57,13 +61,7 @@ def _tasks_required(root: Path, size: str) -> bool:
 
 
 def _design_required(root: Path, size: str) -> bool:
-    cfg_file = root / CONFIG_PATH
-    cfg = {}
-    if cfg_file.exists():
-        try:
-            cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
-        except yaml.YAMLError:
-            cfg = {}
+    cfg = _config(root)
     return bool(cfg.get("require_design")) and size in cfg.get("design_required_for", ["large", "complex"])
 
 
@@ -157,16 +155,20 @@ def create(root: Path, name: str, size: str = "medium", acs: int = 1) -> tuple[P
         raise SpecifyError(f"size inválido '{size}': small | medium | large | complex")
     if acs < 1:
         raise SpecifyError("--acs precisa ser pelo menos 1")
-    ids, features, last_dir = _existing(root)
+    try:
+        ids, features, last_dir = _existing(root)
+    except (OSError, UnicodeError) as exc:
+        raise SpecifyError(f"spec existente ilegível: {exc}") from exc
     if name in features:
         raise SpecifyError(f"já existe uma feature '{name}'")
     folder = root / "specs/features" / f"FEATURE-{last_dir + 1:03d}"
-    folder.mkdir(parents=True)
     with_design = _design_required(root, size)
+    with_tasks = _tasks_required(root, size)
+    confined(root, folder.relative_to(root).as_posix())
+    folder.mkdir(parents=True)
     path = folder / "spec.yaml"
     with_limits = with_design and (root / "specs/agents.yaml").exists()
-    path.write_text(render(name, size, acs, ids, with_design, with_limits,
-                           _tasks_required(root, size)), encoding="utf-8")
+    atomic_write(root, path.relative_to(root).as_posix(), render(name, size, acs, ids, with_design, with_limits, with_tasks))
     allocated = {"REQ": f"REQ-{ids['REQ'] + 1:03d}",
                  "AC": ", ".join(f"AC-{ids['AC'] + i:03d}" for i in range(1, acs + 1))}
     if with_design:

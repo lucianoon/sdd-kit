@@ -229,6 +229,20 @@ def test_ac_087_semantica_documentada(repo):
     assert semantic_hash("") == semantic_hash("  \n")  # vazio e só espaço são o mesmo vazio
 
 
+def test_ac_114_hash_preserva_cerquilha_em_bloco_literal():
+    from sdd.diff import semantic_hash
+    before = "summary: |\n  # instrução original\n"
+    after = "summary: |\n  # instrução alterada\n"
+    assert semantic_hash(before) != semantic_hash(after)
+    assert semantic_hash("# comentário\nversion: 1\n") == semantic_hash("version: 1\n")
+
+
+def test_ac_114_hash_de_yaml_atipico_nao_quebra():
+    from sdd.diff import semantic_hash
+    assert semantic_hash("1: x\na: y\n")
+    assert semantic_hash("loop: &a {ref: *a}\n")
+
+
 def test_ac_088_mudanca_comentarios_alienigenas(repo):
     # YAML quebrado: compara como texto cru e aceita mudança real
     from sdd.diff import semantic_hash

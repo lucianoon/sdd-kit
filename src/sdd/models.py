@@ -1,9 +1,20 @@
 """Schema canônico das especificações. Fonte única: daqui sai o JSON Schema."""
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
+from pathlib import PurePosixPath, PureWindowsPath
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+
+
+def relative_path(value: str) -> str:
+    p = PurePosixPath(value)
+    if (not value or value.strip() != value or value in (".", "./") or p.is_absolute()
+            or PureWindowsPath(value).drive or "\\" in value or ".." in p.parts or "\0" in value):
+        raise ValueError("caminho deve ser relativo ao projeto, sem raiz, traversal ou barras invertidas")
+    return value
+
+ProjectPath = Annotated[str, AfterValidator(relative_path)]
 
 REQ_PATTERN = r"^REQ-\d{3,}$"
 AC_PATTERN = r"^AC-\d{3,}$"
@@ -11,7 +22,7 @@ NFR_PATTERN = r"^NFR-\d{3,}$"
 
 
 class Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 class Acceptance(Strict):
@@ -201,7 +212,7 @@ class Eval(Strict):
     id: str = Field(pattern=EVAL_PATTERN)
     metric: str = Field(min_length=1)
     description: str = ""
-    dataset: str = Field(min_length=1)  # JSONL no repo, cada linha com "id" único
+    dataset: ProjectPath = Field(min_length=1)  # JSONL no repo, cada linha com "id" único
     min_cases: int = Field(ge=1)  # casos distintos exigidos em CADA execução
     runs: int = Field(3, ge=1)  # execuções independentes (o LLM varia entre elas)
     aggregate: Literal["pass_rate", "mean_score"] = "pass_rate"
@@ -413,7 +424,7 @@ class Spec(Strict):
 
 class TestsConfig(Strict):
     command: str
-    junit: str
+    junit: ProjectPath
     timeout: int = Field(3600, ge=1)  # segundos; vale para testes e gates
     # Onde ficam os testes (para o `sdd diff` reconhecer um teste de regressão em SDD-Fix).
     paths: list[str] = ["tests/**", "test/**", "**/test_*.py", "**/*_test.py", "**/*_test.go",
@@ -446,7 +457,7 @@ class EvalsConfig(Strict):
     # Roda o harness. Ele grava <results_dir>/<EVAL-ID>.jsonl, uma linha por caso e execução:
     # {"case": "<id do dataset>", "run": 1, "pass": true}   ou   {..., "score": 0.82}
     command: str | None = None
-    results_dir: str = ".sdd/evals"
+    results_dir: ProjectPath = ".sdd/evals"
     timeout: int = Field(3600, ge=1)
     # Política do projeto: evals com judge: llm só são aceitas se isto for true.
     allow_llm_judge: bool = False

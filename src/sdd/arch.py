@@ -7,6 +7,8 @@ import-linter) como `gates`.
 """
 from __future__ import annotations
 
+import ast
+import os
 import posixpath
 import re
 from dataclasses import dataclass
@@ -14,7 +16,6 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 
 from .diff import matches
-from .textscan import python_string_lines
 
 PY_EXT = (".py",)
 JS_EXT = (".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts")
@@ -22,8 +23,6 @@ GO_EXT = (".go",)
 SKIP_DIRS = {".git", ".sdd", "node_modules", ".venv", "venv", "__pycache__", "dist", "build"}
 
 ALLOW = re.compile(r"sdd:\s*allow\s+(ARCH-\d{3,})\b[ \t]*(.*)")
-PY_IMPORT = re.compile(r"^\s*import\s+(.+)$")
-PY_FROM = re.compile(r"^\s*from\s+(\.*)([\w.]*)\s+import\b")
 JS_PATTERNS = [
     re.compile(r"\bfrom\s*['\"]([^'\"]+)['\"]"),
     re.compile(r"^\s*import\s*['\"]([^'\"]+)['\"]"),
@@ -50,32 +49,34 @@ def _strip_ext(p: str) -> str:
     return p
 
 
-def _python(rel: str, lines: list[str]) -> list[Import]:
+def _python(rel: str, lines: list[str], modules: dict[str, str]) -> list[Import]:
     out = []
     pkg = rel.split("/")[:-1]
-    in_string = python_string_lines("\n".join(lines) + "\n")
-    for n, line in enumerate(lines, 1):
-        s = line.strip()
-        if n in in_string or s.startswith("#"):
-            continue
-        allow = _allow(line)
-        m = PY_FROM.match(line)
-        if m:
-            dots, name = m.group(1), m.group(2)
-            if dots:  # import relativo: resolve para um caminho do repo
-                base = pkg[: len(pkg) - (len(dots) - 1)] if len(dots) > 1 else pkg
-                parts = base + (name.split(".") if name else [])
-                path = "/".join(parts)
-                out.append(Import(n, dots + name, ".".join(parts), path, allow))
+    tree = ast.parse("\n".join(lines), filename=rel)
+    nodes = sorted((n for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))),
+                   key=lambda n: (n.lineno, n.col_offset))
+    for node in nodes:
+        n = node.lineno
+        allow = _allow(lines[n - 1])
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                out.append(Import(n, alias.name, alias.name, modules.get(alias.name), allow))
+        else:
+            name = node.module or ""
+            dots = "." * node.level
+            if node.level:
+                base = pkg[:len(pkg) - node.level + 1]
+                path = "/".join(base + (name.split(".") if name else []))
+                module = path.replace("/", ".")
             else:
-                out.append(Import(n, name, name, None, allow))
-            continue
-        m = PY_IMPORT.match(line)
-        if m:
-            for chunk in m.group(1).split("#")[0].split(","):
-                name = chunk.strip().split(" as ")[0].strip()
-                if name:
-                    out.append(Import(n, name, name, None, allow))
+                path, module = modules.get(name), name
+            if name:
+                out.append(Import(n, dots + name, module, path, allow))
+            for alias in node.names:
+                child = (path + "/" + alias.name) if path else modules.get(name + "." + alias.name)
+                if alias.name != "*" and (not name or child in modules.values()):
+                    out.append(Import(n, dots + name + ("." if name else "") + alias.name,
+                                      module + "." + alias.name, child, allow))
     return out
 
 
@@ -127,13 +128,10 @@ def _allow(line: str) -> tuple[str, str] | None:
     return (m.group(1), m.group(2).strip()) if m else None
 
 
-def imports(root: Path, rel: str) -> list[Import]:
-    try:
-        lines = (root / rel).read_text(encoding="utf-8").splitlines()
-    except (UnicodeDecodeError, FileNotFoundError):
-        return []
+def imports(root: Path, rel: str, modules: dict[str, str] | None = None) -> list[Import]:
+    lines = (root / rel).read_text(encoding="utf-8").splitlines()
     if rel.endswith(PY_EXT):
-        return _python(rel, lines)
+        return _python(rel, lines, modules or {})
     if rel.endswith(JS_EXT):
         return _js(rel, lines)
     if rel.endswith(GO_EXT):
@@ -150,11 +148,12 @@ def module_matches(module: str, pattern: str) -> bool:
 def source_files(root: Path) -> list[str]:
     exts = PY_EXT + JS_EXT + GO_EXT
     out = []
-    for p in root.rglob("*"):
-        if p.is_file() and p.name.endswith(exts):
-            rel = p.relative_to(root).as_posix()
-            if not SKIP_DIRS.intersection(rel.split("/")[:-1]):
-                out.append(rel)
+    for directory, folders, names in os.walk(root):
+        folders[:] = sorted(n for n in folders if n not in SKIP_DIRS)
+        for name in names:
+            p = Path(directory) / name
+            if p.is_file() and name.endswith(exts):
+                out.append(p.relative_to(root).as_posix())
     return sorted(out)
 
 
@@ -166,16 +165,32 @@ def check(proj) -> dict:
     if not proj.arch:
         return report
     files = source_files(proj.root)
+    modules = {}
+    for file in files:
+        if file.endswith(".py"):
+            stem = file[:-3]
+            if stem.endswith("/__init__"):
+                stem = stem[:-9]
+            modules[stem.replace("/", ".")] = stem
+            if stem.startswith("src/"):
+                modules[stem[4:].replace("/", ".")] = stem
+    report["rule_results"] = {}
     checked: set[str] = set()
     for rule in proj.arch:
+        start_problems = len(report["problems"])
+        start_violations = len(report["violations"])
         targets = [f for f in files if matches(f, rule.sources)]
         if not targets:
             report["problems"].append(
                 f"{rule.id}: nenhum arquivo casa {rule.sources} (glob errado? a regra não protege nada)")
-            continue
         checked.update(targets)
         for rel in targets:
-            for imp in imports(proj.root, rel):
+            try:
+                observed = imports(proj.root, rel, modules)
+            except (OSError, UnicodeError, SyntaxError) as exc:
+                report["problems"].append(f"{rule.id}: {rel}: não foi possível analisar: {exc}")
+                continue
+            for imp in observed:
                 hit = next((p for p in rule.forbid if module_matches(imp.module, p)), None)
                 if hit is None and imp.path is not None:
                     hit = next((p for p in rule.forbid_paths
@@ -190,6 +205,8 @@ def check(proj) -> dict:
                     if imp.allow and imp.allow[0] == rule.id:
                         entry["detail"] = "marcação sdd: allow sem motivo não vale"
                     report["violations"].append(entry)
+        report["rule_results"][rule.id] = ("OK" if len(report["problems"]) == start_problems
+                                          and len(report["violations"]) == start_violations else "FALHOU")
     report["files"] = len(checked)
     report["ok"] = not report["violations"] and not report["problems"]
     return report

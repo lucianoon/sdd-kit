@@ -6,6 +6,7 @@ gates:
   compila: "python -m compileall -q src"
 code:
   - src/**
+  - scripts/**
 require_design: true
 require_tasks: true
 mutation:

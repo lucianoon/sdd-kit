@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from . import scaffold
+from .artifacts import atomic_write
 
 CONFIG_PATH = "specs/sdd.yaml"
 AGENTS_MD = "AGENTS.md"
@@ -16,8 +17,7 @@ def _write_new(root: Path, rel: str, content: str, actions: list[str]) -> None:
     if p.exists():
         actions.append(f"mantido  {rel}")
         return
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(content, encoding="utf-8")
+    atomic_write(root, rel, content)
     actions.append(f"criado   {rel}")
 
 
@@ -46,7 +46,7 @@ def _config(root: Path, layer: str, actions: list[str]) -> None:
         text = text.rstrip("\n") + "\n" + snippet
         changed = True
     if changed:
-        cfg.write_text(text, encoding="utf-8")
+        atomic_write(root, CONFIG_PATH, text)
         actions.append(f"config   {CONFIG_PATH}: {', '.join(keys)}")
     else:
         actions.append(f"mantido  {CONFIG_PATH}: {', '.join(keys)} já configurado")
@@ -60,7 +60,7 @@ def _agents_md(root: Path, layer: str, actions: list[str]) -> None:
     text = p.read_text(encoding="utf-8") if p.exists() else scaffold.AGENTS_CORE
     if f"<!-- sdd:{layer} -->" in text:
         return
-    p.write_text(text.rstrip("\n") + "\n" + section, encoding="utf-8")
+    atomic_write(root, AGENTS_MD, text.rstrip("\n") + "\n" + section)
     actions.append(f"seção    {AGENTS_MD}: {layer}")
 
 
@@ -71,8 +71,7 @@ def _workflow_mutate(root: Path, actions: list[str]) -> None:
     text = p.read_text(encoding="utf-8")
     if "sdd mutate" in text or "      - if: always()" not in text:
         return
-    p.write_text(text.replace("      - if: always()", scaffold.MUTATE_STEP + "      - if: always()", 1),
-                 encoding="utf-8")
+    atomic_write(root, WORKFLOW_PATH, text.replace("      - if: always()", scaffold.MUTATE_STEP + "      - if: always()", 1))
     actions.append(f"passo    {WORKFLOW_PATH}: sdd mutate nos PRs")
 
 
@@ -98,6 +97,7 @@ def init(root: Path, preset: str = "minimo", profile: str | None = None) -> list
         raise ValueError(f"preset '{preset}' não existe (disponíveis: {', '.join(scaffold.PRESETS)})")
     if profile not in (None, "agentes"):
         raise ValueError(f"perfil '{profile}' não existe (disponível: agentes)")
+    root.mkdir(parents=True, exist_ok=True)
     actions: list[str] = []
     for rel, content in scaffold.initial_files(preset).items():
         _write_new(root, rel, content, actions)

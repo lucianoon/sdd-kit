@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from .core import Project
+from .project import Project
 from .report import constitution_section, metadata, version_line
 
 GIT_TIMEOUT = 60  # segundos
@@ -79,15 +79,18 @@ def semantic_hash(text: str) -> str:
     Comment-only defuses: uma edição que só acrescenta comentário (ou reordena chaves,
     muda aspas ou espaçamento) produz o mesmo hash e não libera o diff.
 
-    Comentários de linha (`#`) e de bloco são removidos antes do parse — YAML não os
-    preserva de todo jeito; remover antes evia falsa diferença por formatação.
+    O parser ignora comentários YAML, mas preserva cerquilhas que fazem parte de
+    valores literais. Remover linhas antes do parse apagaria conteúdo da spec.
     """
-    body = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
+    body = text
     try:
         data = yaml.safe_load(body) or {}
-    except yaml.YAMLError:
+    except (yaml.YAMLError, TypeError, RecursionError):
         return repr(("ilegível", body.strip()))  # YAML quebrado: compara como texto cru
-    return repr(_canon(data))
+    try:
+        return repr(_canon(data))
+    except (TypeError, RecursionError):
+        return repr(("ilegível", body.strip()))
 
 
 def _canon(obj):
@@ -115,7 +118,7 @@ class DiffResult:
 
 def _regression_tests(proj: Project, changed: list[str], ids: set[str]) -> dict[str, list[str]]:
     """Para cada ID, os arquivos de teste alterados no PR que o citam."""
-    from .core import ID_IN_TEST
+    from .project import ID_IN_TEST
 
     test_globs = proj.config.tests.paths if proj.config else []
     found: dict[str, list[str]] = {i: [] for i in ids}

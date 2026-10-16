@@ -1,5 +1,5 @@
 feature: mutacao
-version: 2
+version: 3
 size: large
 summary: Medir operadores mutados numa cópia isolada e preservar o diretório original.
 assumptions:
@@ -56,6 +56,13 @@ requirements:
     when: sdd mutate roda
     then: temporários dos filhos ficam isolados; cópia indisponível produz erro de execução incompleta
       e nunca aprovação por pontuação parcial
+- id: REQ-028
+  description: Preservar o checkout durante mutação mesmo com links.
+  acceptance:
+  - id: AC-107
+    given: candidato de mutação em symlink que aponta para fora da cópia ou dependência compartilhada
+    when: a mutação seleciona alvos
+    then: recusa o alvo inseguro antes de escrever e preserva o arquivo original
 design:
   numbers:
   - metric: specs por projeto
@@ -136,6 +143,14 @@ tasks:
   - AC-056
   - AC-057
   - AC-093
+  status: done
+- id: T-028
+  title: Preservar o checkout durante mutação mesmo com links.
+  origin:
+  - REQ-028
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-107
   status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.

@@ -18,7 +18,7 @@ O que o kit não garante, de onde vieram as ideias e o que vem depois.
   à força (kill) pode deixar a cópia em `/tmp/sdd-mutate-*`; o próximo `mutate` remove as
   órfãs mais velhas que 24 horas.
 - `size` é declarado por quem escreve a spec; a única trava objetiva é o número de arquivos.
-- O `arch` lê imports como texto: não vê dependências indiretas (A importa B que importa
+- O `arch` usa AST no Python e texto nas outras stacks: não vê dependências indiretas (A importa B que importa
   infra), import dinâmico por string montada em tempo de execução, nem injeção por
   reflexão. Cobre o caso comum; para o resto, ferramentas dedicadas como gates.
 - `dependencies` garante que o modo de falha foi **declarado e tem teste ligado**, não que
@@ -67,7 +67,7 @@ agente, não verificação). Elas combinam bem com o sdd-kit se você usar a ski
 3. Associar exceções a arquivos ou commits específicos dentro da feature; hoje o alcance
    é o intervalo da feature nomeada.
 
-Este repositório se verifica: `sdd check` na raiz roda as nove specs de capacidades em
+Este repositório se verifica: `sdd check` na raiz roda as dez specs de capacidades em
 `specs/features/FEATURE-*/spec.yaml`.
 
 ## Créditos

@@ -18,8 +18,8 @@ principles:
     rule: Todo comando externo tem timeout e mata a árvore de processos ao estourar.
     enforced_by: [kit:dependencies, AC-059]
   - id: CONST-07
-    rule: O kit funciona em Linux, macOS e Windows, com Python 3.10 a 3.13.
-    manual: CI testa Python 3.10 a 3.13 no Linux e Python 3.12 no macOS e Windows; jobs obrigatórios para o merge
+    rule: O kit funciona em Linux, macOS e Windows, com Python 3.10 a 3.14.
+    manual: CI testa Python 3.10 a 3.14 no Linux e Python 3.12 no macOS e Windows; jobs obrigatórios para o merge
   - id: CONST-08
     rule: Nenhuma leitura ou escrita depende da codificação padrão do sistema.
     manual: o CI roda os testes com EncodingWarning tratado como erro

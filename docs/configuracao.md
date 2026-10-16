@@ -44,6 +44,11 @@ evals:                     # camada evals
 O mutate define `TMPDIR`, `TEMP` e `TMP` privados à cópia, substituindo esses três
 valores também quando aparecem em `mutation.env`. Os demais valores são preservados.
 
+Números devem ser finitos. Chaves YAML duplicadas reprovam. `tests.junit`, datasets e
+`evals.results_dir` usam caminhos relativos com `/`, sem drives, `..` ou barras invertidas.
+A gravação de artefatos recusa links e usa substituição atômica. Veja
+[garantias e migração](arquitetura-interna.md).
+
 ## Camadas
 
 | Camada | `sdd enable` cria ou altera | Para quê |

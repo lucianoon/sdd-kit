@@ -1,5 +1,5 @@
 feature: arquitetura
-version: 2
+version: 3
 size: large
 summary: Verificar dependências declaradas nas regras ARCH, com exceções registradas.
 assumptions: []
@@ -44,6 +44,17 @@ requirements:
     given: aspas triplas dentro de uma string comum num arquivo Python
     when: sdd arch ou sdd mutate leem o arquivo
     then: o restante do arquivo continua sendo analisado
+- id: REQ-029
+  description: Verificar imports Python pela sintaxe e falhar quando a análise é impossível.
+  acceptance:
+  - id: AC-108
+    given: imports Python relativos, absolutos, multilinha e from pacote import modulo
+    when: regras de arquitetura são executadas
+    then: detecta imports de módulos e caminhos proibidos sem executar o código
+  - id: AC-109
+    given: arquivo sujeito a regra ilegível, UTF-8 inválido ou Python com sintaxe inválida
+    when: o arch verifica a regra
+    then: registra problema e reprova em vez de apresentar ausência de imports como aprovação
 design:
   numbers:
   - metric: specs por projeto
@@ -63,11 +74,12 @@ design:
       - CI
       freshness: imediata
   alternatives:
-  - name: análise de imports com tokenização e texto
+  - name: AST Python e leitura textual JS/TS/Go
     chosen: true
-    why: cobre as stacks suportadas sem ferramentas externas
-  - name: um parser completo por linguagem
-    why_not: custo adicional; regras avançadas entram como gates
+    why: parser padrão do Python cobre sintaxe real sem executar o código; outras stacks mantêm limites
+      documentados
+  - name: regex para todos os imports
+    why_not: omite aliases e imports no formato from pacote import modulo
   risks:
   - area: other
     severity: medium
@@ -90,6 +102,15 @@ tasks:
   - AC-047
   - AC-048
   - AC-058
+  status: done
+- id: T-029
+  title: Verificar imports Python pela sintaxe e falhar quando a análise é impossível.
+  origin:
+  - REQ-029
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-108
+  - AC-109
   status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.

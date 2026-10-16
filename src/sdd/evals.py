@@ -6,16 +6,15 @@ são calculados aqui, de forma determinística: o harness não declara a própri
 """
 from __future__ import annotations
 
-import json
 import math
-import shutil
 from collections import defaultdict
 from pathlib import Path
 
-from .core import Project, dataset_ids
+from .project import Project, dataset_ids
 from .procs import run_shell
 from .models import Eval
 from .report import metadata, version_line, constitution_section
+from .artifacts import ArtifactError, confined, parse_json
 
 Z95 = 1.959964
 
@@ -49,13 +48,19 @@ def evaluate(feature: str, ev: Eval, known: set[str], results: Path) -> dict:
         return _row(feature, ev, "SEM_RESULTADO", f"harness não gerou {results.name}")
 
     per_run: dict[int, dict[str, dict]] = defaultdict(dict)
-    for n, line in enumerate(results.read_text(encoding="utf-8").splitlines(), 1):
+    try:
+        text = results.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        return _row(feature, ev, "INCOMPLETO", f"resultado ilegível: {exc}")
+    for n, line in enumerate(text.splitlines(), 1):
         if not line.strip():
             continue
         try:
-            r = json.loads(line)
-            case, run = str(r["case"]), int(r["run"])
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            r = parse_json(line)
+            case, run = str(r["case"]), r["run"]
+            if type(run) is not int or run < 1:
+                raise ValueError("run deve ser inteiro positivo")
+        except (KeyError, TypeError, ValueError):
             return _row(feature, ev, "INCOMPLETO", f"linha {n}: esperado {{case, run, pass|score}}")
         if case not in known:
             return _row(feature, ev, "INCOMPLETO", f"caso '{case}' não existe no dataset")
@@ -126,9 +131,23 @@ def run(proj: Project) -> dict:
         report.update(ok=False, problems=["evals.command não configurado em specs/sdd.yaml"])
         return report
 
-    out_dir = proj.root / cfg.results_dir
-    shutil.rmtree(out_dir, ignore_errors=True)  # nunca aceitar resultado de execução anterior
-    out_dir.mkdir(parents=True)
+    try:
+        out_dir = confined(proj.root, cfg.results_dir)
+        protected = [proj.root / "specs", proj.root / "src", proj.root / ".git"]
+        protected += [proj.root / e.dataset for _, e in pairs]
+        protected += [p for p in proj.root.iterdir()
+                      if p.name != ".sdd" and p.is_dir() and p.resolve() != out_dir]
+        if (any(p.resolve().is_relative_to(out_dir) for p in protected)
+                or any(out_dir.is_relative_to((proj.root / d).resolve()) for d in ("src", "specs", ".git"))):
+            raise ArtifactError("results_dir contém fontes, specs ou dataset protegido")
+        # Apaga somente artefatos desta execução, nunca recursivamente a pasta configurada.
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for _, ev in pairs:
+            result = confined(proj.root, f"{cfg.results_dir}/{ev.id}.jsonl")
+            result.unlink(missing_ok=True)
+    except (OSError, ArtifactError) as exc:
+        report.update(ok=False, problems=[f"diretório de resultados inseguro: {exc}"])
+        return report
     r = run_shell(cfg.command, proj.root, cfg.timeout)
     rc, out = r.returncode, r.output[-4000:]
     if r.timed_out:
@@ -139,7 +158,11 @@ def run(proj: Project) -> dict:
 
     for spec, ev in pairs:
         known, _ = dataset_ids(proj.root / ev.dataset)
-        row = evaluate(spec.feature, ev, known, out_dir / f"{ev.id}.jsonl")
+        try:
+            result = confined(proj.root, f"{cfg.results_dir}/{ev.id}.jsonl")
+            row = evaluate(spec.feature, ev, known, result)
+        except ArtifactError as exc:
+            row = _row(spec.feature, ev, "INCOMPLETO", str(exc))
         report["evals"].append(row)
         if row["verdict"] != "OK":
             report["problems"].append(f"{ev.id} ({spec.feature}): {row['verdict']} {row['detail']}".rstrip())

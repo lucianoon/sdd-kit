@@ -33,3 +33,11 @@ decisions:
     rationale: >-
       Distinguir execução, declaração e julgamento probabilístico impede que um
       relatório aprovado sugira garantias além das evidências coletadas.
+  - id: AD-006
+    title: Separar carregamento, execução e persistência protegida
+    decision: >-
+      project carrega declarações; core executa checks; artifacts protege IO;
+      evidence interpreta resultados por regra. Imports públicos de core permanecem compatíveis.
+    rationale: >-
+      Uma regra de IO e evidência compartilhada evita falhas inconsistentes e concentra
+      correções sem criar interfaces abstratas sem adaptadores reais.

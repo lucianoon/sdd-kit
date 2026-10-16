@@ -1,5 +1,5 @@
 feature: verificacao
-version: 2
+version: 3
 size: large
 summary: Validar contratos, ligar critérios ao JUnit e executar testes e gates.
 assumptions: []
@@ -134,6 +134,22 @@ requirements:
     given: um comando que estoura o timeout e tem processos filhos
     when: o kit encerra o comando
     then: a árvore inteira de processos morre, sem órfãos consumindo CPU
+- id: REQ-026
+  description: Carregar contratos sem ambiguidades e separar leitura de execução.
+  acceptance:
+  - id: AC-103
+    given: campos numéricos de configuração ou spec com NaN ou infinito
+    when: o schema valida o documento
+    then: rejeita todos os números não finitos, inclusive thresholds, limites de custo e NFRs
+  - id: AC-104
+    given: arquivos YAML com chaves duplicadas, codificação inválida ou falha de leitura
+    when: o projeto é carregado
+    then: produz diagnósticos com caminho e não executa comandos nem lança traceback de leitura
+  - id: AC-105
+    given: uso público de core.load e core.Project e projeto inválido
+    when: o motor ou a biblioteca é chamado
+    then: preserva os imports existentes e o carregamento sem execução; check de projeto inválido retorna
+      reprovação sem executar testes
 design:
   numbers:
   - id: NFR-001
@@ -281,6 +297,16 @@ tasks:
   evidence:
   - NFR-001
   status: done
+- id: T-026
+  title: Carregar contratos sem ambiguidades e separar leitura de execução.
+  origin:
+  - REQ-026
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-103
+  - AC-104
+  - AC-105
+  status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.
 quality_gates:
@@ -290,3 +316,4 @@ paths:
 - src/sdd/models.py
 - src/sdd/procs.py
 - src/sdd/textscan.py
+- src/sdd/project.py

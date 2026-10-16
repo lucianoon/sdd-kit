@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .artifacts import atomic_write
+
 
 def metadata(command: str) -> dict:
     from . import __version__
@@ -19,11 +21,11 @@ def version_line(report: dict) -> str:
 
 
 def write_command_report(root: Path, command: str, report, markdown: str) -> Path:
-    d = root / ".sdd"
-    d.mkdir(exist_ok=True)
-    (d / f"{command}.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    md = d / f"{command}.md"
-    md.write_text(markdown, encoding="utf-8")
+    if not command or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-_" for c in command):
+        raise ValueError("nome de relatório inválido")
+    payload = json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False)
+    atomic_write(root, f".sdd/{command}.json", payload)
+    md = atomic_write(root, f".sdd/{command}.md", markdown)
     return md
 
 
@@ -56,9 +58,8 @@ def render_markdown(report: dict) -> str:
     if report.get("risks"):
         out += ["", "## Riscos", "", "| Feature | Área | Severidade | Risco | Tratamento |", "|---|---|---|---|---|"]
         arch_rep = report.get("architecture") or {}
-        violated = {v["rule"] for v in arch_rep.get("violations", [])}
-        for rule_id in arch_rep.get("rules", []):
-            verdicts[rule_id] = "VIOLADA" if rule_id in violated else "OK"
+        from .evidence import architecture_verdicts
+        verdicts.update(architecture_verdicts(arch_rep))
         for k in report["risks"]:
             if k["mitigated_by"]:
                 how = ", ".join(
@@ -116,9 +117,4 @@ def render_markdown(report: dict) -> str:
 
 
 def write_report(proj, report: dict) -> Path:
-    d = proj.root / ".sdd"
-    d.mkdir(exist_ok=True)
-    (d / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    md = d / "report.md"
-    md.write_text(render_markdown(report), encoding="utf-8")
-    return md
+    return write_command_report(proj.root, "report", report, render_markdown(report))

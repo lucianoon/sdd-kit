@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import yaml
+import pytest
 from typer.testing import CliRunner
 
 from sdd import arch, core
@@ -304,3 +305,45 @@ def test_sem_regras_aprova(tmp_path):
     project(tmp_path, {"src/a.py": "import openai\n"}, rules={"rules": []})
     rep = arch_report(tmp_path)
     assert rep["ok"] is True and rep["rules"] == []
+
+
+@pytest.mark.parametrize("statement", [
+    "from .. import infra\n", "from ..infra import (\n    db,\n)\n",
+    "import infra.db\n", "from infra import db\n",
+])
+def test_ac_108_ast_imports_pacote_modulo_e_absolutos(tmp_path, statement):
+    project(tmp_path, {"src/domain/a.py": statement, "src/infra/db.py": "x = 1\n", "src/infra/__init__.py": ""})
+    rep = arch_report(tmp_path)
+    assert not rep["ok"] and any(v["file"] == "src/domain/a.py" for v in rep["violations"])
+
+
+@pytest.mark.parametrize("content", [b"from openai import (", b"\xff\x80"])
+def test_ac_109_arquivo_impossivel_de_analisar_reprova(tmp_path, content):
+    project(tmp_path, {"src/domain/a.py": "x = 1\n"})
+    (tmp_path / "src/domain/a.py").write_bytes(content)
+    rep = arch_report(tmp_path)
+    assert not rep["ok"] and "não foi possível analisar" in rep["problems"][0]
+
+
+def test_ac_110_constituicao_mantem_resultado_por_regra(tmp_path):
+    project(tmp_path, {"src/domain/a.py": "import openai\n", "src/infra/db.py": "x = 1\n"}, rules={"rules": [
+        RULES["rules"][0], {"id": "ARCH-002", "description": "infra sem redis", "from": ["src/infra/**"], "forbid": ["redis"]}]})
+    (tmp_path / "specs/constitution.yaml").write_text(yaml.safe_dump({"principles": [
+        {"id": "CONST-01", "rule": "domínio", "enforced_by": ["ARCH-001"]},
+        {"id": "CONST-02", "rule": "infra", "enforced_by": ["ARCH-002"]}]}), encoding="utf-8")
+    result = runner.invoke(app, ["arch", "-C", str(tmp_path)])
+    assert result.exit_code == 1
+    import json
+    report = json.loads((tmp_path / ".sdd/arch.json").read_text(encoding="utf-8"))
+    assert report["rule_results"] == {"ARCH-001": "FALHOU", "ARCH-002": "OK"}
+    assert [c["status"] for c in report["constitution"]] == ["VIOLADO", "APROVADO"]
+
+
+@pytest.mark.parametrize("statement", ["from infra import db\n", "from ..infra import db\n"])
+def test_ac_108_proibicao_do_submodulo_com_pacote_permitido(tmp_path, statement):
+    project(tmp_path, {"src/domain/a.py": statement, "src/infra/__init__.py": "", "src/infra/db.py": "x = 1\n"},
+            rules={"rules": [{"id": "ARCH-001", "description": "domínio sem banco",
+                              "from": ["src/domain/**"], "forbid_paths": ["src/infra/db"]}]})
+    rep = arch_report(tmp_path)
+    assert not rep["ok"] and len(rep["violations"]) == 1
+    assert rep["violations"][0]["matched"] == "src/infra/db"

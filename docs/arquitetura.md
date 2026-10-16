@@ -24,11 +24,14 @@ ERRO  ARCH-001  src/domain/pedido.py:3  importa 'openai'
 
 - Lê imports de **Python** (`import`, `from`, relativos), **JS/TS** (`from`, `require`,
   `import()`, multilinha, ESM com extensão) e **Go** (simples e em bloco). Comentários e
-  strings longas não contam (o Python é lido com o tokenizador da própria linguagem).
+  strings longas não contam (Python usa AST, sem executar o código). Imports absolutos
+  locais da raiz e do layout `src/`, aliases e `from pacote import modulo` também são resolvidos.
 - `forbid` casa módulos e subcaminhos (`openai` pega `openai.types` e `openai/resources`,
   mas não `openai_helpers`); aceita curingas.
 - Regra cujo `from` não casa nenhum arquivo **reprova**: glob errado não pode virar
   "aprovado em silêncio".
+- Arquivo sujeito à regra com erro de sintaxe Python, leitura ou codificação **reprova**.
+  `rule_results` registra o resultado por regra e é usado por todos os relatórios.
 - Exceção pontual, auditável, na linha do import:
   `import openai  # sdd: allow ARCH-001 adapter legado até a AD-007`. Sem motivo não vale;
   as exceções aparecem no relatório.

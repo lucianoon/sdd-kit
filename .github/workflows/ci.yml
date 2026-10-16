@@ -1,4 +1,6 @@
 name: ci
+permissions:
+  contents: read
 on:
   push:
     branches: [main]
@@ -11,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python: ["3.10", "3.11", "3.12", "3.13"]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         include:
           - os: windows-latest
             python: "3.12"
@@ -38,6 +40,7 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install -e ".[dev]"
       - run: sdd validate
+      - run: sdd analyze
       - if: github.event_name == 'pull_request'
         run: sdd diff --base "origin/${{ github.base_ref }}"
       - run: sdd check
@@ -45,7 +48,7 @@ jobs:
         run: sdd mutate --base "origin/${{ github.base_ref }}"
       - if: always()
         shell: bash
-        run: cat .sdd/report.md .sdd/mutation.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        run: cat .sdd/analyze.md .sdd/report.md .sdd/mutation.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
   # Prova de agnosticismo: o rastreio funciona com os runners reais de outras stacks.
   exemplos:

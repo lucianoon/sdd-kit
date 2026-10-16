@@ -1,5 +1,5 @@
 feature: governanca
-version: 2
+version: 3
 size: large
 summary: Validar decisões e tarefas e reportar constituição, evidências e versão sem aprovação implícita.
 assumptions: []
@@ -87,6 +87,14 @@ requirements:
     given: as specs do próprio kit
     when: a propriedade do código é avaliada
     then: cada arquivo de produção tem uma feature dona, sem um glob único que cubra todo src/sdd
+- id: REQ-030
+  description: Interpretar evidência de arquitetura de forma única nos relatórios.
+  acceptance:
+  - id: AC-110
+    given: resultado de arquitetura com regra aprovada e outra reprovada
+    when: CLI, check e constituição interpretam evidências
+    then: mantêm o mesmo estado por regra, sem aprovar regra não executada nem reprovar regra independente
+      aprovada
 design:
   numbers:
   - metric: specs por projeto
@@ -169,6 +177,14 @@ tasks:
   - AC-091
   - AC-092
   status: done
+- id: T-030
+  title: Interpretar evidência de arquitetura de forma única nos relatórios.
+  origin:
+  - REQ-030
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-110
+  status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.
 quality_gates:
@@ -176,3 +192,4 @@ quality_gates:
 paths:
 - src/sdd/analysis.py
 - src/sdd/report.py
+- src/sdd/evidence.py

@@ -1,5 +1,5 @@
 feature: evals
-version: 3
+version: 4
 size: large
 summary: Agregar resultados de comportamento com critérios estatísticos e política explícita para juiz
   LLM.
@@ -32,7 +32,8 @@ requirements:
   - id: AC-102
     given: mean_score com NaN, infinito, booleano, valor não numérico ou agregação não finita
     when: sdd eval processa os resultados
-    then: reprova como INCOMPLETO com motivo explícito e sem gravar agregados não finitos; scores finitos permanecem avaliados pelos limites
+    then: reprova como INCOMPLETO com motivo explícito e sem gravar agregados não finitos; scores finitos
+      permanecem avaliados pelos limites
   - id: AC-037
     given: variação entre execuções acima de max_run_spread
     when: sdd eval roda
@@ -77,6 +78,13 @@ requirements:
     given: um critério com efeitos proibidos
     when: o relatório é gerado
     then: os efeitos proibidos aparecem junto do resultado esperado
+- id: REQ-027
+  description: Rejeitar resultados estatísticos ambíguos e execuções inválidas.
+  acceptance:
+  - id: AC-106
+    given: resultados JSONL com chaves duplicadas, run não inteiro positivo ou arquivo ilegível
+    when: a eval processa os casos
+    then: retorna INCOMPLETO com diagnóstico e não aprova nem lança traceback
 design:
   numbers:
   - metric: specs por projeto
@@ -165,6 +173,14 @@ tasks:
   - AC-070
   - AC-071
   - AC-072
+  status: done
+- id: T-027
+  title: Rejeitar resultados estatísticos ambíguos e execuções inválidas.
+  origin:
+  - REQ-027
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-106
   status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.

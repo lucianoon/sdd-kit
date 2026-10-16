@@ -1,5 +1,5 @@
 feature: adocao
-version: 3
+version: 4
 size: large
 summary: Inicializar projetos, gerar specs e habilitar camadas sem sobrescrever conteúdo.
 assumptions: []
@@ -62,6 +62,14 @@ requirements:
     when: os comandos e instruções são consultados
     then: analyze e guide estão disponíveis em Markdown ou JSON e AGENTS.md orienta análise antes de implementar
       e convergência após implementar
+- id: REQ-032
+  description: Preparar distribuição verificável antes da publicação.
+  acceptance:
+  - id: AC-113
+    given: wheel e sdist produzidos pelo projeto
+    when: o smoke test de distribuição é executado
+    then: o pacote instalado expõe CLI, catálogo, análise e guia; release exige tag igual à versão e sucesso
+      da validação antes de publicar
 design:
   numbers:
   - metric: specs por projeto
@@ -131,6 +139,14 @@ tasks:
   evidence:
   - AC-100
   status: done
+- id: T-032
+  title: Preparar distribuição verificável antes da publicação.
+  origin:
+  - REQ-032
+  done_when: os critérios associados passam no sdd check
+  evidence:
+  - AC-113
+  status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.
 quality_gates:
@@ -141,3 +157,4 @@ paths:
 - src/sdd/specify.py
 - src/sdd/layers.py
 - src/sdd/__init__.py
+- scripts/smoke_dist.py
