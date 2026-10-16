@@ -421,8 +421,13 @@ def run_feature(proj: Project, spec, only: set[str] | None = None,
             rep.error = "o build não passa sem mutações; corrija mutation.build antes de medir"
             rep.mutants = []
             return rep
-        if _run(cmd, work, env, cfg.timeout) != "passed":
+        baseline = _run(cmd, work, env, cfg.timeout)
+        if baseline == "timeout":
+            rep.error = (f"a suíte sem mutações excedeu mutation.timeout ({cfg.timeout}s); "
+                         "aumente o timeout ou use um mutation.command mais rápido")
+        elif baseline != "passed":
             rep.error = "a suíte não passa sem mutações; corrija os testes antes de medir"
+        if rep.error:
             rep.mutants = []
             return rep
         for m in rep.mutants:

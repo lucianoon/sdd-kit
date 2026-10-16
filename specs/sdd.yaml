@@ -15,3 +15,4 @@ mutation:
     PYTHONPATH: "{root}/src"   # o kit está instalado em modo editável
   min_score: 0.9
   max_mutants: 25
+  timeout: 300    # a suíte sem o NFR-001 leva ~2 min; o padrão de 120 s estoura

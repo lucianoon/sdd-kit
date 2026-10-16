@@ -489,3 +489,15 @@ def test_ac_118_return_com_aspas_escapadas_e_de_uma_linha(tmp_path):
 def test_ac_116_generic_com_espaco_interno_nao_e_mutado(tmp_path):
     ts = "const xs: Array< number > = f(a > b);\n"
     assert _ops(tmp_path, "a.ts", ts, COMPARA) == [(1, ">→<=")]
+
+
+def test_ac_120_suite_base_que_estoura_timeout_e_erro_proprio(tmp_path):
+    project(tmp_path, FORTE)
+    cfg_file = tmp_path / "specs/sdd.yaml"
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
+    cfg["tests"]["command"] = f'"{PY}" -c "import time; time.sleep(5)"'
+    cfg["mutation"]["timeout"] = 1
+    cfg_file.write_text(encoding="utf-8", data=yaml.safe_dump(cfg))
+    r = mutate(tmp_path)
+    assert r.exit_code == 2, r.output
+    assert "excedeu mutation.timeout (1s)" in r.output and "não passa sem mutações" not in r.output

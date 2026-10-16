@@ -40,6 +40,8 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
   contavam como mortos, inflando o score.
 - `+` e `-` grudados num identificador terminado em `e` (`size+1`) não eram mutados; só a
   notação científica (`1e-5`) deve ficar de fora.
+- Suíte sem mutações que estoura `mutation.timeout` era relatada como "a suíte não passa";
+  agora o erro cita o timeout (AC-120).
 - `pip` declarado nos extras `dev`: o smoke do wheel usa `python -m pip`, ausente em venvs
   criados pelo uv.
 

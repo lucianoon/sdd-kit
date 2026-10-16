@@ -37,6 +37,10 @@ requirements:
     given: uma suíte que já falha sem mutações
     when: sdd mutate roda
     then: o mutate sai com erro em vez de medir
+  - id: AC-120
+    given: uma suíte que passa, mas sem mutações já excede mutation.timeout
+    when: sdd mutate roda
+    then: o mutate sai com erro que cita o timeout em segundos, distinto de suíte falhando
   - id: AC-033
     given: operadores dentro de strings, comentários ou linhas com sdd no-mutate
     when: os candidatos são gerados
@@ -182,6 +186,7 @@ tasks:
   - AC-031
   - AC-032
   - AC-033
+  - AC-120
   - AC-088
   - AC-056
   - AC-057
