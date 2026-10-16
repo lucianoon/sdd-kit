@@ -19,8 +19,10 @@ def wheel(tmp_path_factory):
 
 def run_smoke(wheel, cwd):
     root = Path(__file__).resolve().parents[1]
+    # O smoke imprime acentos; sem isto o Windows escreve cp1252 no pipe e a leitura utf-8 quebra.
     return subprocess.run([sys.executable, str(root / "scripts/smoke_dist.py"), str(wheel)],
-                          cwd=cwd, capture_output=True, encoding="utf-8")
+                          cwd=cwd, capture_output=True, encoding="utf-8",
+                          env={**os.environ, "PYTHONIOENCODING": "utf-8"})
 
 
 def test_ac_113_wheel_instalado_funciona_fora_do_checkout(tmp_path, wheel):
