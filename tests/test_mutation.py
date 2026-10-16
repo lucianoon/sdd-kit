@@ -474,3 +474,18 @@ def test_ac_118_operadores_de_sintaxe_c(tmp_path):
 def test_ac_119_mais_e_menos_grudados_em_identificador_e_notacao_cientifica(tmp_path):
     code = "x = size+1\ny = 1e-5\nz = n-1\nw = 2.5E+3\n"
     assert _ops(tmp_path, "a.py", code, ("+→-", "-→+")) == [(1, "+→-"), (3, "-→+")]
+
+
+def test_ac_118_operadores_de_python_nao_valem_para_ruby(tmp_path):
+    so_python = ("not→∅", "is→is not", "is not→is", "in→not in", "not in→in")
+    assert _ops(tmp_path, "a.rb", "ok = a in xs and not b\nfor x in xs do end\n", so_python) == []
+
+
+def test_ac_118_return_com_aspas_escapadas_e_de_uma_linha(tmp_path):
+    code = 'def f(b):\n    return "a\\"(" + b\n'  # o ( está dentro da string: a linha é completa
+    assert _ops(tmp_path, "a.py", code, ("return→nulo",)) == [(2, "return→nulo")]
+
+
+def test_ac_116_generic_com_espaco_interno_nao_e_mutado(tmp_path):
+    ts = "const xs: Array< number > = f(a > b);\n"
+    assert _ops(tmp_path, "a.ts", ts, COMPARA) == [(1, ">→<=")]

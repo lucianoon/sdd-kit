@@ -70,7 +70,7 @@ def _balanced(text: str) -> bool:
         elif c in ")]}":
             depth -= 1
             if depth < 0:
-                return False
+                return False  # sdd: no-mutate (None também é falso: mutante equivalente)
         i += 1
     return depth == 0 and quote is None
 
@@ -257,7 +257,7 @@ def _angle_skips(line: str, ext: str) -> set[int]:
 
 def _compiles(text: str, rel: str) -> bool:
     try:
-        compile(text, rel, "exec", dont_inherit=True)
+        compile(text, rel, "exec", dont_inherit=True)  # sdd: no-mutate (só herdaria annotations, que não muda a sintaxe)
     except (SyntaxError, ValueError):
         return False
     return True
