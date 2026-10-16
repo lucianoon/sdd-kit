@@ -468,6 +468,9 @@ class MutationConfig(Strict):
     min_score: float = Field(0.8, ge=0, le=1)
     max_mutants: int = Field(50, ge=1)
     timeout: int = Field(120, ge=1)  # segundos por mutante; estouro conta como morto
+    # Compila sem rodar testes (ex.: "tsc --noEmit", "go vet ./..."); mutante que falha aqui é
+    # inválido e fica fora do score em vez de contar como morto.
+    build: str | None = None
     extensions: list[str] = [".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".java", ".kt",
                              ".cs", ".rb", ".php", ".rs", ".c", ".cc", ".cpp", ".swift", ".scala"]
     # Diretórios pesados que a cópia isolada referencia por symlink em vez de copiar.

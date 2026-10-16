@@ -80,10 +80,29 @@ mede a detecção dos operadores amostrados sem LLM:
 1. Copia o projeto para um diretório temporário. Os filhos recebem `TMPDIR`, `TEMP`
    e `TMP` privados à cópia; uma limpeza no runner não alcança cópias irmãs.
 2. Confere que a suíte passa sem mutações (senão, sai com código 2).
-3. Para cada mutante, troca **um** operador no código dos `paths` da feature
-   (`>`→`<=`, `==`→`!=`, `and`→`or`, `True`→`False`, `+`→`-`...) e roda os testes.
+3. Para cada mutante, troca **um** trecho no código dos `paths` da feature e roda os testes.
 4. Testes falharam = mutante morto. Passaram = **sobreviveu**: aquele comportamento não é
    verificado por ninguém.
+
+| Grupo | Mutações | Onde |
+|---|---|---|
+| Comparação e lógica | `>`→`<=`, `==`→`!=`, `and`→`or`, `&&`→`\|\|`... | todas |
+| Booleanos | `True`→`False`, `true`→`false` | todas |
+| Aritmética | `+`↔`-`, `*`↔`/`, `%`→`*` (só binários: `*args`, ponteiro e `**` ficam) | todas |
+| Constantes | inteiro `n`→`n+1` (literais com zero à esquerda ficam) | todas |
+| Negação e pertinência | remove `not`, `is`↔`is not`, `in`↔`not in` (o `in` de `for` fica) | Python |
+| Negação | remove `!` (`x!`, `macro!`, `!!` e `!=` ficam) | sintaxe C e PHP |
+| Retorno | `return <expr>` de uma linha → `return None` / `return undefined` | Python, JS, TS |
+
+A extensão decide a sintaxe: `#` é comentário em Python e Ruby, `//` nas linguagens com
+sintaxe C (em Python `//` é divisão inteira; em JS/TS `#` é campo privado). Os `<` e `>` de
+tipos genéricos (TS, Java, Kotlin, C#, Rust, C++, Swift, Scala) e de tags JSX não são mutados.
+
+**Mutante que não compila não conta como morto.** Em Python, o candidato com erro de sintaxe é
+descartado antes de rodar testes. Nas outras linguagens, configure `mutation.build` (ex.:
+`tsc --noEmit`, `go vet ./...`, `cargo check`): o mutante que falha no build fica **inválido**,
+fora do score e listado no relatório. Sem `build`, um erro de compilação ainda derruba a suíte
+e conta como morto.
 
 ```
 $ sdd mutate
@@ -101,6 +120,7 @@ mutation:
   max_mutants: 50          # amostra determinística e espalhada: mesmo resultado em toda execução
   timeout: 120             # por mutante; estouro (ex.: loop infinito) conta como morto
   command: "pytest -q -x"  # padrão: tests.command. Falhar rápido acelera muito
+  build: "npx tsc --noEmit" # opcional: falha aqui = mutante inválido, fora do score
   env:
     PYTHONPATH: "{root}/src"   # pacote instalado em modo editável apontaria para o original
 ```

@@ -30,6 +30,7 @@ mutation:                  # camada mutate
   min_score: 0.8
   max_mutants: 50
   timeout: 120             # por mutante; estouro conta como morto
+  build: null              # ex.: "tsc --noEmit"; falha = mutante inválido, fora do score
   extensions: [".py", ".ts", ".go", ...]
   link: [node_modules, .venv, venv]   # referenciados por symlink na cópia isolada
   env: {}                  # ex.: PYTHONPATH: "{root}/src" para pacote editável

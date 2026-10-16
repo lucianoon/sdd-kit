@@ -164,7 +164,7 @@ def test_ac_033_strings_comentarios_e_marcacao_nao_sao_mutados(tmp_path):
 def test_operadores_nao_quebram_setas_e_incrementos(tmp_path):
     (tmp_path / "a.ts").write_text(encoding="utf-8", data="const f = (x) => x->y;\ni++;\nx += 1;\nif (a >= b) {}\n")
     ops = {(m.line, m.operator) for m in candidates(tmp_path, ["a.ts"])}
-    assert ops == {(4, ">=→<")}
+    assert ops == {(3, "n→n+1"), (4, ">=→<")}  # x += 1 só gera a troca da constante
 
 
 LOOP = '''\
@@ -362,3 +362,115 @@ def test_pasta_com_nome_de_codigo_nao_quebra(tmp_path):
 def test_ac_033_cerquilha_dentro_de_string_nao_vira_comentario(tmp_path):
     (tmp_path / "a.py").write_text(encoding="utf-8", data='url = "/doc#secao" + sufixo  # a > b\n')
     assert [(m.line, m.col, m.operator) for m in candidates(tmp_path, ["a.py"])] == [(1, 20, "+→-")]
+
+
+def _ops(root: Path, name: str, code: str, only: tuple[str, ...] = ()) -> list[tuple[int, str]]:
+    (root / name).write_text(encoding="utf-8", data=code)
+    return [(m.line, m.operator) for m in candidates(root, [name]) if not only or m.operator in only]
+
+
+COMPARA = ("<→>=", ">→<=", "and→or", "&&→||")
+
+
+def test_ac_115_divisao_inteira_em_python_nao_vira_comentario(tmp_path):
+    code = "def f(a, b):\n    return a // b > 0 and a < b  # x > y\n"
+    assert _ops(tmp_path, "a.py", code, COMPARA) == [(2, "<→>="), (2, ">→<="), (2, "and→or")]
+    assert all(m.mutated.endswith("# x > y") for m in candidates(tmp_path, ["a.py"]))
+
+
+def test_ac_115_cerquilha_em_js_e_campo_privado_e_barras_em_c_sao_comentario(tmp_path):
+    js = "class C { #n = 0; ok() { return this.#n > 1 && a; } }  // x > y\n"
+    assert _ops(tmp_path, "a.js", js, COMPARA) == [(1, ">→<="), (1, "&&→||")]
+    assert _ops(tmp_path, "a.c", "int x = a > b; // c > d\n", COMPARA) == [(1, ">→<=")]
+    assert _ops(tmp_path, "b.py", "x = a > b  # c > d // e\n", COMPARA) == [(1, ">→<=")]
+
+
+def test_ac_116_generics_nao_sao_mutados_e_comparacao_na_mesma_linha_e(tmp_path):
+    ts = "const m: Map<string, Array<number>> = new Map(); if (a < b) {}\n"
+    assert _ops(tmp_path, "a.ts", ts, COMPARA) == [(1, "<→>=")]
+    java = "List<Integer> xs = f(a > b);\n"
+    assert _ops(tmp_path, "A.java", java, COMPARA) == [(1, ">→<=")]
+    rs = "let v: Vec<u8> = Vec::<u8>::new(); if a > b {}\n"
+    assert _ops(tmp_path, "a.rs", rs, COMPARA) == [(1, ">→<=")]
+    laco = "for (int i = 0; i<n; i++) { ok = x>y; }\n"  # comparação sem espaço continua sendo comparação
+    assert _ops(tmp_path, "a.cpp", laco, COMPARA) == [(1, "<→>="), (1, ">→<=")]
+
+
+def test_ac_116_tags_jsx_nao_sao_mutadas(tmp_path):
+    jsx = 'const el = <div className="x">{a > b}</div>;\n'
+    assert _ops(tmp_path, "a.jsx", jsx, COMPARA) == [(1, ">→<=")]
+    assert _ops(tmp_path, "b.tsx", "const v = <Item k={1} />; ok = i<n;\n", COMPARA) == [(1, "<→>=")]
+
+
+def test_ac_117_python_com_erro_de_sintaxe_e_descartado(tmp_path):
+    code = "total = sum(x\n            for x\n            in xs)\nok = a in xs\n"
+    found = _ops(tmp_path, "a.py", code, ("in→not in",))
+    assert found == [(4, "in→not in")]  # a linha 3 viraria "not in xs)": SyntaxError, descartado
+
+
+def test_ac_117_falha_do_build_e_mutante_invalido_fora_do_score(tmp_path):
+    import json
+
+    project(tmp_path, FORTE)
+    cfg_file = tmp_path / "specs/sdd.yaml"
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
+    # "Compilador" que rejeita <= : o mutante > → <= de maior() não compila.
+    cfg["mutation"]["build"] = (f'"{PY}" -c "import sys; '
+                                "sys.exit(1 if '<=' in open('src/calc.py').read() else 0)\"")
+    cfg_file.write_text(encoding="utf-8", data=yaml.safe_dump(cfg))
+    r = mutate(tmp_path)
+    assert r.exit_code == 0, r.output
+    assert "invalid   src/calc.py:2" in r.output, r.output
+    rep = json.loads((tmp_path / ".sdd/mutation.json").read_text(encoding="utf-8"))[0]
+    status = [m["status"] for m in rep["mutants"]]
+    assert status.count("invalid") == 1 and "survived" not in status
+    assert rep["score"] == 1.0  # o inválido não entra no denominador nem conta como morto
+    md = (tmp_path / ".sdd/mutation.md").read_text(encoding="utf-8")
+    assert "1 inválido(s)" in md and "src/calc.py:2" in md
+
+
+def test_ac_117_build_que_falha_sem_mutacao_e_erro(tmp_path):
+    project(tmp_path, FORTE)
+    cfg_file = tmp_path / "specs/sdd.yaml"
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
+    cfg["mutation"]["build"] = f'"{PY}" -c "import sys; sys.exit(3)"'
+    cfg_file.write_text(encoding="utf-8", data=yaml.safe_dump(cfg))
+    r = mutate(tmp_path)
+    assert r.exit_code == 2 and "build não passa sem mutações" in r.output, r.output
+
+
+def test_ac_118_operadores_de_python(tmp_path):
+    code = (
+        "def f(a, b, xs):\n"
+        "    if not a and b is None and a in xs:\n"
+        "        return a * 2 / b % 3\n"
+        "    for x in xs:\n"
+        "        pass\n"
+        "    return [x ** 2 for x in xs]\n"
+    )
+    found = _ops(tmp_path, "a.py", code)
+    for esperado in [(2, "not→∅"), (2, "is→is not"), (2, "in→not in"), (3, "*→/"), (3, "/→*"),
+                     (3, "%→*"), (3, "n→n+1"), (3, "return→nulo"), (6, "return→nulo"), (6, "n→n+1")]:
+        assert esperado in found, (esperado, found)
+    assert not [f for f in found if f[0] in (4, 6) and f[1] in ("in→not in", "*→/")], found
+    mut = [(m.operator, m.mutated.strip()) for m in candidates(tmp_path, ["a.py"]) if m.line == 3]
+    assert ("return→nulo", "return None") in mut
+    assert [t for op, t in mut if op == "n→n+1"] == ["return a * 3 / b % 3", "return a * 2 / b % 4"]
+    neg = "ok = a is not b and c not in d\n"
+    assert _ops(tmp_path, "b.py", neg, ("is not→is", "not in→in", "not→∅", "is→is not", "in→not in")) == [
+        (1, "is not→is"), (1, "not in→in")]
+
+
+def test_ac_118_operadores_de_sintaxe_c(tmp_path):
+    go = "if !ok { x := *p * 2 }\n"
+    assert _ops(tmp_path, "a.go", go, ("!→∅", "*→/")) == [(1, "*→/"), (1, "!→∅")]  # *p é ponteiro
+    assert _ops(tmp_path, "a.rs", 'println!("x"); let ok = a != b;\n', ("!→∅",)) == []
+    js = "function f(a, b) {\n  return a + b;\n}\nfunction g() {\n  return (\n    1\n  );\n}\n"
+    (tmp_path / "a.js").write_text(encoding="utf-8", data=js)
+    rets = [(m.line, m.mutated.strip()) for m in candidates(tmp_path, ["a.js"]) if m.operator == "return→nulo"]
+    assert rets == [(2, "return undefined;")]  # o return de várias linhas não é mutado
+
+
+def test_ac_119_mais_e_menos_grudados_em_identificador_e_notacao_cientifica(tmp_path):
+    code = "x = size+1\ny = 1e-5\nz = n-1\nw = 2.5E+3\n"
+    assert _ops(tmp_path, "a.py", code, ("+→-", "-→+")) == [(1, "+→-"), (3, "-→+")]

@@ -63,7 +63,7 @@ def test_ac_089_eval_aplicavel_nao_executada_fica_pendente(tmp_path):
 
 
 def test_ac_089_mutacao_sem_candidatos_nao_e_evidencia(tmp_path):
-    mut_project(tmp_path, FORTE, code="x = 1\n")
+    mut_project(tmp_path, FORTE, code="x = y\n")  # nenhum operador nem constante
     write(tmp_path, "specs/constitution.yaml", yaml.safe_dump(constitution("kit:mutate")))
     r = runner.invoke(app, ["mutate", "-C", str(tmp_path)])
     assert r.exit_code == 0, r.output

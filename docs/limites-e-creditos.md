@@ -13,8 +13,12 @@ O que o kit não garante, de onde vieram as ideias e o que vem depois.
 - O rastreio prova que existe um teste **nomeado** para o AC e que ele passa. O `mutate`
   prova que os testes da feature detectam código errado, mas não que o teste do AC-001
   verifica exatamente o `then` do AC-001. Isso continua sendo revisão humana.
-- A mutação é textual: pode gerar mutantes equivalentes (sobrevivem sem culpa dos testes),
-  e só cobre operadores, não remoção de linhas ou troca de constantes. Execução interrompida
+- A mutação é textual, com regras léxicas por extensão: pode gerar mutantes equivalentes
+  (sobrevivem sem culpa dos testes) e não remove linhas arbitrárias nem troca chamadas ou
+  strings. Generics e JSX são reconhecidos por heurística de uma linha: tag JSX quebrada em
+  várias linhas ou `f(a<b, c>d)` (ambíguo também para o compilador de C#) podem gerar mutante
+  que não compila; fora de Python, só `mutation.build` separa esse caso de um mutante morto.
+  Execução interrompida
   à força (kill) pode deixar a cópia em `/tmp/sdd-mutate-*`; o próximo `mutate` remove as
   órfãs mais velhas que 24 horas.
 - `size` é declarado por quem escreve a spec; a única trava objetiva é o número de arquivos.

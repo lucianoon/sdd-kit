@@ -1,11 +1,13 @@
 feature: mutacao
-version: 3
+version: 4
 size: large
 summary: Medir operadores mutados numa cópia isolada e preservar o diretório original.
 assumptions:
 - assumption: linguagens alvo da mutação não foram fixadas
-  chosen: operadores textuais comuns a Python e linguagens com sintaxe C
-  rationale: cobre a maioria das stacks sem depender de parser por linguagem
+  chosen: operadores textuais comuns a Python e linguagens com sintaxe C, com regras léxicas por
+    extensão (comentário, aspas, generics e JSX) e operadores restritos à linguagem onde valem
+  rationale: cobre a maioria das stacks sem depender de parser por linguagem; a regra por extensão
+    evita lacunas silenciosas (// em Python) e mutantes que só quebram a compilação
 open_questions: []
 decisions:
 - AD-005
@@ -63,6 +65,35 @@ requirements:
     given: candidato de mutação em symlink que aponta para fora da cópia ou dependência compartilhada
     when: a mutação seleciona alvos
     then: recusa o alvo inseguro antes de escrever e preserva o arquivo original
+- id: REQ-033
+  description: Mutar conforme a sintaxe da linguagem e com operadores que expõem testes fracos comuns.
+  acceptance:
+  - id: AC-115
+    given: '`//` em Python (divisão inteira) ou `#` em JS/TS (campo privado), seguidos de operadores na mesma linha'
+    when: os candidatos são gerados
+    then: os operadores depois deles são mutados; `#` em Python e `//` em linguagens com sintaxe C continuam
+      sendo comentário
+  - id: AC-116
+    given: '`<` e `>` de tipos genéricos (TS, Java, Kotlin, C#, Rust, C++, Swift, Scala) ou de tags JSX numa
+      linha que também tem uma comparação'
+    when: os candidatos são gerados
+    then: só a comparação é mutada; os delimitadores de tipo e de tag não geram candidato
+  - id: AC-117
+    given: um mutante que não compila
+    when: sdd mutate roda
+    then: em Python o candidato com erro de sintaxe é descartado antes de rodar testes; com `mutation.build`
+      configurado, a falha do build marca o mutante como inválido, fora do score e listado no relatório;
+      nunca conta como morto
+  - id: AC-118
+    given: código com `not`, `is`, `in` (Python), `!` (sintaxe C), `*`, `/` e `%` binários, constantes inteiras
+      e `return <expressão>` de uma linha (Python, JS e TS)
+    when: os candidatos são gerados
+    then: cada construção gera seu mutante (remoção ou inversão, `*`↔`/`, `%`→`*`, n→n+1, `return None` ou
+      `return undefined`); o `in` de `for ... in`, `**`, ponteiros e `return` de várias linhas não são mutados
+  - id: AC-119
+    given: '`+` ou `-` grudados num identificador terminado em `e` (size+1) e em notação científica (1e-5)'
+    when: os candidatos são gerados
+    then: o do identificador é mutado e o da notação científica não
 design:
   numbers:
   - metric: specs por projeto
@@ -98,6 +129,18 @@ design:
     severity: medium
     description: mutação textual gera mutantes equivalentes que sobrevivem sem culpa dos testes
     accepted: marcação sdd no-mutate e min_score abaixo de 100% absorvem o ruído
+  - area: data_integrity
+    severity: high
+    description: mutante que só quebra a compilação conta como morto e infla o score
+    mitigated_by:
+    - AC-116
+    - AC-117
+  - area: data_integrity
+    severity: medium
+    description: regra léxica errada esconde código da mutação e o score sobe sem medir nada
+    mitigated_by:
+    - AC-115
+    - AC-119
   - area: data_integrity
     severity: high
     description: mutate corromper o código do usuário
@@ -151,6 +194,20 @@ tasks:
   done_when: os critérios associados passam no sdd check
   evidence:
   - AC-107
+  status: done
+- id: T-033
+  title: Mutar conforme a sintaxe da linguagem e com operadores ampliados.
+  origin:
+  - REQ-033
+  depends_on:
+  - T-10
+  done_when: AC-115 a AC-119 passam no sdd check
+  evidence:
+  - AC-115
+  - AC-116
+  - AC-117
+  - AC-118
+  - AC-119
   status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.
