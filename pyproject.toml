@@ -14,7 +14,7 @@ keywords = ["sdd", "spec-driven-development", "ai-agents", "llm", "evals", "muta
 dependencies = ["typer>=0.12", "pydantic>=2.6", "pyyaml>=6"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "build>=1.2", "hatchling>=1.25"]
+dev = ["pytest>=8", "build>=1.2", "hatchling>=1.25", "pip>=23"]  # pip: smoke do wheel instalado
 
 [project.scripts]
 sdd = "sdd.cli:app"

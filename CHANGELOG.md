@@ -8,6 +8,15 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 
 ### Adicionado
 
+- `sdd mutate` com operadores ampliados (REQ-033): `*`↔`/`, `%`→`*`, constante inteira
+  `n`→`n+1`, remoção de `not` e `!`, `is`↔`is not`, `in`↔`not in` e `return <expr>` →
+  `return None`/`undefined`. **Migração:** os novos mutantes podem baixar o score de projetos
+  existentes; fortaleça os testes (ou marque equivalentes com `sdd: no-mutate`), não reduza o
+  `min_score`.
+- `mutation.build`: comando de compilação por mutante; falha marca o mutante como inválido,
+  fora do score e listado no relatório. Em Python, mutante com erro de sintaxe é descartado
+  antes de rodar testes.
+
 - Workflow de release por tag (`v*`): build + `twine check` + publicação no PyPI
   via trusted publishing (sem segredo no repo). Requer configurar o *pending publisher*
   uma vez no PyPI: projeto `sdd-kit-ai`, repo `lucianoon/sdd-kit`, workflow `release.yml`.
@@ -22,6 +31,17 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 - Nome do pacote no PyPI: `sdd-kit` → **`sdd-kit-ai`** — o nome antigo está ocupado no
   PyPI por outro projeto (VS Code/Copilot). O comando `sdd`, o módulo `sdd` e a
   instalação pela fonte continuam iguais.
+
+### Corrigido
+
+- `sdd mutate` tratava `//` como comentário em Python (divisão inteira escondia o resto da
+  linha da mutação) e `#` como comentário em JS/TS (campos privados).
+- `<` e `>` de tipos genéricos e tags JSX viravam mutantes que só quebravam a compilação e
+  contavam como mortos, inflando o score.
+- `+` e `-` grudados num identificador terminado em `e` (`size+1`) não eram mutados; só a
+  notação científica (`1e-5`) deve ficar de fora.
+- `pip` declarado nos extras `dev`: o smoke do wheel usa `python -m pip`, ausente em venvs
+  criados pelo uv.
 
 ## [0.14.0] — 2026-10-15
 
