@@ -26,6 +26,12 @@ def paths(name: str):
     return base + "/change.yaml", base + "/spec.yaml", base + "/baseline.yaml"
 
 
+def exact_text(path: Path) -> str:
+    # Baselines and rollback must preserve CRLF as well as LF on every platform.
+    with path.open(encoding="utf-8", newline="") as stream:
+        return stream.read()
+
+
 def propose(root: Path, name: str, feature: str, reason: str):
     if not reason.strip():
         raise ArtifactError("informe o motivo da mudança")
@@ -35,7 +41,7 @@ def propose(root: Path, name: str, feature: str, reason: str):
         if confined(root, value).exists():
             raise ArtifactError(f"mudança existente preservada: {name}")
     source = confined(root, target)
-    text = source.read_text(encoding="utf-8")
+    text = exact_text(source)
     change = Change(name=name, feature=feature, target=target, baseline_sha256=digest(source), reason=reason)
     atomic_write(root, baseline, text)
     atomic_write(root, proposal, text)
@@ -73,8 +79,8 @@ def apply(root: Path, name: str):
         raise ArtifactError("mudança já aplicada ou spec vigente alterada; reconcilie a proposta")
     manifest, proposal, _ = paths(name)
     # Publish only a candidate accepted by the full loader; restore on failure.
-    baseline = confined(root, change.target).read_text(encoding="utf-8")
-    atomic_write(root, change.target, confined(root, proposal).read_text(encoding="utf-8"))
+    baseline = exact_text(confined(root, change.target))
+    atomic_write(root, change.target, exact_text(confined(root, proposal)))
     try:
         errors = core.load(root).errors
         if errors:

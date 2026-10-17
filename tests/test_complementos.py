@@ -257,3 +257,25 @@ def test_ac_124_archive_recusa_qualquer_lado_alterado_apos_apply(tmp_path, targe
     with pytest.raises(ArtifactError, match="inalterada"):
         changes.archive(tmp_path, "corrigir-agenda")
     assert not (tmp_path / "specs/changes/corrigir-agenda/verification.json").exists()
+
+
+def test_ac_124_crlf_preservado_na_baseline_aplicacao_e_rollback(tmp_path):
+    project(tmp_path)
+    path = tmp_path / SPEC_PATH
+    crlf = path.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8")
+    path.write_bytes(crlf)
+    proposal = changed_proposal(tmp_path)
+    baseline = tmp_path / "specs/changes/corrigir-agenda/baseline.yaml"
+    assert baseline.read_bytes() == crlf
+    changes.inspect(tmp_path, "corrigir-agenda")
+    spec = load_yaml(tmp_path / proposal)
+    spec["requirements"][0]["acceptance"][0]["then"] = "PREENCHER: resultado"
+    save(tmp_path, proposal, spec)
+    with pytest.raises(ArtifactError, match="inválida"):
+        changes.apply(tmp_path, "corrigir-agenda")
+    assert path.read_bytes() == crlf
+    spec["requirements"][0]["acceptance"][0]["then"] = "cria reserva persistida"
+    (tmp_path / proposal).write_bytes(yaml.safe_dump(spec).replace("\n", "\r\n").encode("utf-8"))
+    changes.apply(tmp_path, "corrigir-agenda")
+    assert path.read_bytes() == (tmp_path / proposal).read_bytes()
+    assert changes.archive(tmp_path, "corrigir-agenda")["status"] == "archived"
