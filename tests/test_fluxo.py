@@ -287,3 +287,15 @@ def test_ac_099_markdown_protege_contexto_com_fences_e_tabelas(tmp_path):
     # O diagnóstico pode conter pipes e linhas do YAML; o renderer não deve quebrar a tabela.
     data["findings"].append({"id": "x", "severity": "WARNING", "code": "x", "message": "A|B\nnova linha"})
     assert "A\\|B<br>nova linha" in render_markdown(data)
+
+
+def test_ac_097_markdown_exibe_tarefas_iniciaveis_e_diagnosticos(tmp_path):
+    project(tmp_path, with_tasks(copy.deepcopy(TASKS)))
+    packet = build(core.load(tmp_path), "agenda", "plan")
+    md = render_guide(packet)
+    assert "T-01, T-03" in md
+    spec = with_tasks(copy.deepcopy(TASKS))
+    spec["open_questions"] = [{"question": "pode cancelar?"}]
+    project(tmp_path, spec)
+    md = render_guide(build(core.load(tmp_path), "agenda", "plan"))
+    assert "ERROR" in md and "sem resposta" in md

@@ -42,7 +42,12 @@ def test_erros_de_specify_e_validate_vao_para_stderr(tmp_path):
 
 def test_specify_lista_os_ids_alocados(tmp_path):
     r = run("specify", "primeira", "-C", str(tmp_path))
+    assert r.exit_code == 0, r.output
     assert "IDs      REQ: REQ-001  AC: AC-001" in r.stdout
+    spec = yaml.safe_load((tmp_path / "specs/features/FEATURE-001/spec.yaml").read_text(encoding="utf-8"))
+    # The CLI's documented default creates exactly one criterion, not just a list
+    # whose prefix happens to contain AC-001.
+    assert [ac["id"] for req in spec["requirements"] for ac in req["acceptance"]] == ["AC-001"]
 
 
 def test_erros_de_git_vao_para_stderr(tmp_path):
@@ -125,3 +130,10 @@ def test_schema_sai_com_acentos_legiveis():
     r = run("schema")
     assert r.exit_code == 0 and "Número" in r.stdout and "\\u00fa" not in r.stdout
     json.loads(r.stdout)
+
+
+def test_eval_sem_avaliacoes_configuradas_encerra_com_sucesso(tmp_path):
+    make(tmp_path, "def test_ac_001(): pass\n")
+    result = run("eval", "-C", str(tmp_path))
+    assert result.exit_code == 0, result.output
+    assert "nenhuma eval declarada" in result.stdout and not result.stderr

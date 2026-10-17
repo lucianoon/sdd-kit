@@ -1,0 +1,145 @@
+feature: complementos-sdd
+version: 1
+size: large
+summary: Integrar agentes, revisões semânticas, lições, propostas e importações com
+  evidência explícita.
+assumptions: []
+open_questions: []
+decisions:
+- AD-005
+out_of_scope:
+- Executar ou contratar serviços de LLM
+- Autenticar identidade declarada de revisores
+- Importação semântica completa de todo Markdown de terceiros
+- Transações concorrentes entre vários processos ou arquivos
+requirements:
+- id: REQ-034
+  description: Instalar entradas locais para agentes sem sobrescrever personalizações.
+  acceptance:
+  - id: AC-121
+    given: Codex, Claude Code ou Cursor e arquivos locais existentes
+    when: integrate instala entradas das etapas
+    then: gera orientações que usam guide e check, é idempotente e recusa conflitos
+      antes de gravar
+- id: REQ-035
+  description: Registrar adequação semântica dos testes separadamente da execução.
+  acceptance:
+  - id: AC-122
+    given: critérios e evidências com hashes e linhas
+    when: adequacy verifica uma revisão
+    then: exige cobertura integral, revisores declarados distintos e referências atuais;
+      mudanças de spec, código ou teste invalidam a revisão sem executar testes
+- id: REQ-036
+  description: Aprender com lições revisadas e limitadas ao escopo.
+  acceptance:
+  - id: AC-123
+    given: lições propostas com referências locais
+    when: uma lição é aceita e guide prepara contexto
+    then: inclui somente lições aceitas e atuais do escopo, separa antigas e rejeita
+      dados inválidos
+- id: REQ-037
+  description: Controlar propostas, aplicação e arquivamento de alterações existentes.
+  acceptance:
+  - id: AC-124
+    given: spec vigente e proposta com baseline
+    when: change compara, aplica ou arquiva
+    then: preserva IDs e histórico, rejeita conflitos e restaura spec inválida; archive
+      exige check executado na chamada
+- id: REQ-038
+  description: Importar cenários reconhecidos de Spec Kit e OpenSpec como rascunho.
+  acceptance:
+  - id: AC-125
+    given: Markdown de terceiros com formatos reconhecidos
+    when: import-spec processa requisitos e cenários
+    then: preserva fonte e hash, aloca IDs livres das specs vigentes, informa limitações
+      e mantém campos a preencher fora das specs ativas
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivos YAML e argumentos de CLI
+      source: specs, decisões, constituição e config do projeto
+      frequency: por chamada
+    egress:
+    - to: relatório estático ou contexto para agente
+      consumers:
+      - CLI
+      - CI
+      - agente
+      freshness: estado atual dos arquivos
+  alternatives:
+  - name: Complementos locais e explícitos sobre o motor existente
+    chosen: true
+    why: reutiliza contratos e comandos sem exigir modelo ou serviço externo
+  - name: Orquestrador próprio e importação semântica automática
+    chosen: false
+    why_not: aumenta acoplamento e confunde inferência com evidência
+  risks:
+  - area: other
+    severity: medium
+    description: motor acoplado à CLI impede uso como biblioteca e testes isolados
+    mitigated_by:
+    - ARCH-001
+    - ARCH-002
+  - area: data_integrity
+    severity: medium
+    description: referências e revisões ficam antigas após mudanças
+    mitigated_by:
+    - AC-122
+    - AC-123
+    - AC-124
+  dependencies: []
+tasks:
+- id: T-034
+  title: Instalar entradas locais para agentes sem sobrescrever personalizações.
+  origin:
+  - REQ-034
+  done_when: AC-121 passa com cenários positivos e negativos
+  evidence:
+  - AC-121
+  status: done
+- id: T-035
+  title: Registrar adequação semântica dos testes separadamente da execução.
+  origin:
+  - REQ-035
+  done_when: AC-122 passa com cenários positivos e negativos
+  evidence:
+  - AC-122
+  status: done
+- id: T-036
+  title: Aprender com lições revisadas e limitadas ao escopo.
+  origin:
+  - REQ-036
+  done_when: AC-123 passa com cenários positivos e negativos
+  evidence:
+  - AC-123
+  status: done
+- id: T-037
+  title: Controlar propostas, aplicação e arquivamento de alterações existentes.
+  origin:
+  - REQ-037
+  done_when: AC-124 passa com cenários positivos e negativos
+  evidence:
+  - AC-124
+  status: done
+- id: T-038
+  title: Importar cenários reconhecidos de Spec Kit e OpenSpec como rascunho.
+  origin:
+  - REQ-038
+  done_when: AC-125 passa com cenários positivos e negativos
+  evidence:
+  - AC-125
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+quality_gates:
+- compila
+paths:
+- src/sdd/integrations.py
+- src/sdd/learning.py
+- src/sdd/changes.py
+- src/sdd/adapters.py

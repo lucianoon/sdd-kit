@@ -46,7 +46,9 @@ def build(proj, feature: str, stage: str) -> dict:
     blocked = stage in ("implement", "converge") and bool(proj.errors)
     ready = [t.id for t in spec.tasks if t.status != "done" and all(
         any(d.id == dep and d.status == "done" for d in spec.tasks) for dep in t.depends_on)]
-    return {**metadata("guide"), "feature": feature, "stage": stage,
+    from .learning import context
+    lesson_context = context(proj.root, feature)
+    return {**metadata("guide"), "lessons": lesson_context, "feature": feature, "stage": stage,
             "status": "BLOQUEADO" if blocked else "ORIENTAÇÃO",
             "scope": "contexto para o agente; nenhuma verificação de implementação executada",
             "source": path, "spec": spec.model_dump(),
@@ -78,7 +80,7 @@ def render_markdown(packet: dict) -> str:
             "Fonte: " + packet["source"], ""]
     # Um fence maior que qualquer sequência contida no contexto evita que dados fechem o bloco.
     context = json.dumps({k: packet[k] for k in ("spec", "constitution", "decisions", "architecture",
-                                               "agents_profile", "config", "coverage")}, indent=2, ensure_ascii=False)
+                                               "agents_profile", "config", "coverage", "lessons")}, indent=2, ensure_ascii=False)
     fence = "`" * (max([2] + [len(part) for part in re.findall(r"`+", context)]) + 1)
     out += [fence + "json", context, fence, "", "## Verificação a executar", ""]
     out += [f"- `{c}`" for c in packet["verification"]]

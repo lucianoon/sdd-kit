@@ -61,8 +61,9 @@ Ideias da [TLC Spec-Driven](https://agent-skills.techleads.club/tlc-spec-driven/
 | Fluxo por fases, testes derivados da spec, blast radius | `AGENTS.md` e constituição gerados |
 
 **Não trouxemos:** um verificador LLM como aprovador de ACs e NFRs (evals com juiz LLM
-têm política própria, AD-004/AD-005), a camada de lições aprendidas e a orquestração de sub-agentes (são processo do
-agente, não verificação). Elas combinam bem com o sdd-kit se você usar a skill da TLC junto.
+têm política própria, AD-004/AD-005), a orquestração automática de sub-agentes (é processo do agente, não verificação).
+A camada de lições revisadas e o registro de adequação foram acrescentados como
+complementos explícitos; veja [o guia](complementos.md).
 
 ## Próximos passos sugeridos
 
@@ -71,7 +72,7 @@ agente, não verificação). Elas combinam bem com o sdd-kit se você usar a ski
 3. Associar exceções a arquivos ou commits específicos dentro da feature; hoje o alcance
    é o intervalo da feature nomeada.
 
-Este repositório se verifica: `sdd check` na raiz roda as dez specs de capacidades em
+Este repositório se verifica: `sdd check` na raiz roda as onze specs de capacidades em
 `specs/features/FEATURE-*/spec.yaml`.
 
 ## Créditos
@@ -87,3 +88,7 @@ mudanças vêm do *Guia SDD para Agentes de IA* (Luciano Oliveira Nunes), basead
 
 O perfil de agentes é derivado da *SPEC-BASE v0.1 — Aplicações de agentes de IA*
 (Luciano Oliveira Nunes, 13/10/2026), condensada e acrescida do módulo L (LGPD/PL 2338).
+
+Integrações locais inspiradas no Spec Kit e OpenSpec; ciclo de propostas inspirado no
+[OpenSpec](https://github.com/Fission-AI/OpenSpec); adequação e lições inspiradas na TLC.
+Implementação própria, sem copiar código ou templates dos projetos citados.

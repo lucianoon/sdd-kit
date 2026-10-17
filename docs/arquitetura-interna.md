@@ -92,3 +92,10 @@ O objetivo é reduzir aprovações indevidas, preservar arquivos e manter mudan�
 rastreáveis. Número de testes, mutação amostrada e funcionamento dos pacotes são
 evidências com alcance próprio. Não estabelecem superioridade sobre todos os projetos
 do GitHub nem provam a qualidade semântica de testes, planos ou datasets.
+
+## Complementos do fluxo
+
+`integrations` gera entradas locais sem iniciar agentes. `learning` valida revisões,
+referências e lições; `workflow` só inclui lições aceitas atuais. `adapters` importa
+subconjuntos de Markdown em rascunhos. `changes` gerencia baseline, proposta e histórico;
+apenas archive executa check. Nenhum desses módulos importa SDK de modelo ou CLI.
