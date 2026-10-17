@@ -42,6 +42,8 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
   notação científica (`1e-5`) deve ficar de fora.
 - Suíte sem mutações que estoura `mutation.timeout` era relatada como "a suíte não passa";
   agora o erro cita o timeout (AC-120).
+- Exemplo jest: override do `js-yaml` 4 em `@istanbuljs/load-nyc-config` tira da árvore o
+  `sprintf-js` (GHSA-hp3w-g68c-fv3c, sem versão corrigida publicada).
 - `pip` declarado nos extras `dev`: o smoke do wheel usa `python -m pip`, ausente em venvs
   criados pelo uv.
 
