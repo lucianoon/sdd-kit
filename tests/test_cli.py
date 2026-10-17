@@ -130,3 +130,10 @@ def test_schema_sai_com_acentos_legiveis():
     r = run("schema")
     assert r.exit_code == 0 and "Número" in r.stdout and "\\u00fa" not in r.stdout
     json.loads(r.stdout)
+
+
+def test_eval_sem_avaliacoes_configuradas_encerra_com_sucesso(tmp_path):
+    make(tmp_path, "def test_ac_001(): pass\n")
+    result = run("eval", "-C", str(tmp_path))
+    assert result.exit_code == 0, result.output
+    assert "nenhuma eval declarada" in result.stdout and not result.stderr
