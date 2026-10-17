@@ -1,0 +1,30 @@
+# Configuração do loopway (https://github.com/lucianoon/loopway-ai) para este repositório.
+# O kit roda o próprio loop sobre si mesmo: dogfooding.
+[loopway]
+base_branch = "main"
+max_wip = 1                 # começar devagar: uma tarefa por vez
+max_attempts = 3
+budget_per_run_usd = 5.0
+
+spec_glob = "specs/features/*/spec.yaml"
+sdd_validate_cmd = "sdd validate"
+sdd_guide_cmd = "sdd guide {feature} --stage implement"
+sdd_check_cmd = "sdd check"
+sdd_diff_cmd = "sdd diff --base origin/{base}"
+# `sdd mutate` roda no CI dos PRs do loop; como sensor local ficaria lento por tentativa.
+extra_sensor_cmd = ""
+sensor_timeout_s = 1200     # a suíte com o NFR-001 leva ~2 min
+
+sensitive_paths = [
+  "specs/**",
+  ".github/**",
+  "loopway.toml",
+  "AGENTS.md",
+  "CLAUDE.md",
+  "pyproject.toml",         # dependências e versão são decisão humana
+]
+
+# Os testes fazem `from sdd import ...`: sem isto, importariam o pacote instalado
+# a partir do checkout principal, e não o código alterado na worktree.
+[loopway.sensor_env]
+PYTHONPATH = "{worktree}/src"
