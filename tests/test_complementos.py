@@ -279,3 +279,18 @@ def test_ac_124_crlf_preservado_na_baseline_aplicacao_e_rollback(tmp_path):
     changes.apply(tmp_path, "corrigir-agenda")
     assert path.read_bytes() == (tmp_path / proposal).read_bytes()
     assert changes.archive(tmp_path, "corrigir-agenda")["status"] == "archived"
+
+
+def test_ac_124_cli_ciclo_completo_e_acoes_invalidas(tmp_path):
+    project(tmp_path)
+    result = invoke(tmp_path, "change", "propose", "ajustar", "--feature", "agenda", "--reason", "persistir reserva")
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["status"] == "draft"
+    assert invoke(tmp_path, "change", "archive", "ajustar").exit_code == 2
+    result = invoke(tmp_path, "change", "show", "ajustar")
+    assert result.exit_code == 0 and json.loads(result.stdout)["delta"] == {"added": [], "removed": [], "modified": []}
+    result = invoke(tmp_path, "change", "apply", "ajustar")
+    assert result.exit_code == 0 and json.loads(result.stdout)["status"] == "applied"
+    result = invoke(tmp_path, "change", "archive", "ajustar")
+    assert result.exit_code == 0 and json.loads(result.stdout)["status"] == "archived"
+    assert invoke(tmp_path, "change", "unknown", "ajustar").exit_code == 2
