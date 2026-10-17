@@ -1,6 +1,8 @@
 """sdd mutate: sensor de discriminação determinístico."""
 import hashlib
+import os
 import sys
+import time
 from pathlib import Path
 
 import yaml
@@ -297,8 +299,11 @@ def test_ac_088_rmtree_do_sweep_ignora_erros(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sh, "rmtree", espião)
     monkeypatch.setattr(tf, "gettempdir", lambda: str(tmp_path))
-    (tmp_path / "sdd-mutate-velha").mkdir()
-    assert mutation.sweep_stale(max_age=0) == 1
+    velha = tmp_path / "sdd-mutate-velha"
+    velha.mkdir()
+    # Envelhece de verdade: no Windows, o mtime recém-criado pode ficar à frente de time.time().
+    os.utime(velha, (time.time() - 60, time.time() - 60))
+    assert mutation.sweep_stale(max_age=30) == 1
     assert vistos == [True]  # sem ignore_errors, um diretório travado derrubaria o mutate
 
 
