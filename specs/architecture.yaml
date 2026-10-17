@@ -20,6 +20,10 @@ rules:
       - src/sdd/project.py
       - src/sdd/artifacts.py
       - src/sdd/evidence.py
+      - src/sdd/integrations.py
+      - src/sdd/learning.py
+      - src/sdd/changes.py
+      - src/sdd/adapters.py
     forbid: [typer, click]
     forbid_paths: [src/sdd/cli]
   - id: ARCH-002

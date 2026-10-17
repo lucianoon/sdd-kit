@@ -94,3 +94,10 @@ O fluxo se inspira nas etapas de
 do GitHub Spec Kit. A implementação é própria, com os contratos YAML do sdd-kit e
 agregação determinística. Não importa os artefatos Markdown do Spec Kit nem fornece
 compatibilidade automática com seus comandos ou extensões.
+
+## Complementos locais
+
+O contexto inclui `lessons.accepted` e `lessons.stale`, com referências e hashes.
+Somente lições aceitas e atuais orientam o trabalho. Dados inválidos são recusados.
+`integrate` instala entradas de agente que consomem este guia; `adequacy` registra
+revisão semântica separada. Consulte [complementos](complementos.md).

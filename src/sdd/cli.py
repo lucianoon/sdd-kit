@@ -399,3 +399,107 @@ def eval_cmd(root: Path = Root):
 def schema():
     """Imprime o JSON Schema da spec (para editores e outras ferramentas)."""
     typer.echo(json.dumps(Spec.model_json_schema(), indent=2, ensure_ascii=False))
+
+
+@app.command()
+def integrate(
+    agent: str = typer.Argument(..., help="codex | claude | cursor | all"),
+    root: Path = Root,
+):
+    """Instala entradas locais para as quatro etapas, preservando personalizações."""
+    from .integrations import install
+    for path in install(root, agent):
+        typer.echo(path)
+
+
+@app.command(name="cite")
+def cite_cmd(reference: str = typer.Argument(..., help="arquivo:linha"), root: Path = Root):
+    """Produz referência com hash para revisão ou lição (não executa testes)."""
+    from .learning import citation
+    typer.echo(json.dumps(citation(root, reference).model_dump(), ensure_ascii=False, indent=2))
+
+
+@app.command(name="adequacy")
+def adequacy_cmd(
+    action: str = typer.Argument(..., help="template | check"),
+    feature: str = typer.Argument(...),
+    root: Path = Root,
+):
+    """Prepara ou valida integridade de uma revisão semântica separada."""
+    from .learning import template, adequacy
+    if action == "template":
+        typer.echo(template(root, feature).relative_to(root.resolve()))
+    elif action == "check":
+        report = adequacy(root, feature)
+        typer.echo(json.dumps(report, ensure_ascii=False, indent=2))
+        raise typer.Exit(0 if report["ok"] else 1)
+    else:
+        raise ArtifactError("ação precisa ser template ou check")
+
+
+@app.command(name="lesson")
+def lesson_cmd(
+    action: str = typer.Argument(..., help="add | accept | list"),
+    identity: str = typer.Argument("", help="ID da lição para accept"),
+    feature: str = typer.Option("*", "--feature"),
+    cause: str = typer.Option("", "--cause"),
+    prevention: str = typer.Option("", "--prevention"),
+    evidence: list[str] = typer.Option([], "--evidence", help="arquivo:linha; repetível"),
+    reviewer: str = typer.Option("", "--reviewer"),
+    root: Path = Root,
+):
+    """Propõe lições com evidências; somente aceitas e atuais entram no guide."""
+    from .learning import add_lesson, accept_lesson, lessons
+    if action == "add":
+        value = add_lesson(root, feature, cause, prevention, evidence).model_dump()
+    elif action == "accept":
+        accept_lesson(root, identity, reviewer)
+        value = {"id": identity, "status": "accepted"}
+    elif action == "list":
+        value = lessons(root).model_dump()
+    else:
+        raise ArtifactError("ação precisa ser add, accept ou list")
+    typer.echo(json.dumps(value, ensure_ascii=False, indent=2))
+
+
+@app.command(name="change")
+def change_cmd(
+    action: str = typer.Argument(..., help="propose | show | apply | archive"),
+    name: str = typer.Argument(...),
+    feature: str = typer.Option("", "--feature"),
+    reason: str = typer.Option("", "--reason"),
+    root: Path = Root,
+):
+    """Propõe, compara, aplica e arquiva alterações com baseline e check atual.
+
+    archive executa os comandos de teste e gates configurados no projeto.
+    """
+    from . import changes
+    if action == "propose":
+        result = changes.propose(root, name, feature, reason)
+    elif action == "show":
+        value, _, delta = changes.inspect(root, name)
+        result = {"change": value.model_dump(), "delta": delta}
+    elif action == "apply":
+        result = changes.apply(root, name)
+    elif action == "archive":
+        result = changes.archive(root, name)
+    else:
+        raise ArtifactError("ação precisa ser propose, show, apply ou archive")
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@app.command(name="import-spec")
+def import_spec_cmd(
+    source: str = typer.Argument(..., help="Markdown relativo ao projeto"),
+    kind: str = typer.Option(..., "--format", help="speckit | openspec"),
+    feature: str = typer.Option(..., "--feature"),
+    root: Path = Root,
+):
+    """Importa cenários reconhecidos como rascunho, preservando fonte e lacunas."""
+    from .adapters import import_spec
+    try:
+        report = import_spec(root, source, kind, feature)
+    except (OSError, UnicodeError) as exc:
+        raise ArtifactError(str(exc)) from exc
+    typer.echo(json.dumps(report, ensure_ascii=False, indent=2))

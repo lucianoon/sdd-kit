@@ -48,3 +48,13 @@ def test_ac_113_catalogo_incompleto_bloqueia_distribuicao(tmp_path, wheel, missi
             target.writestr(entry, data)
     result = run_smoke(damaged, tmp_path)
     assert result.returncode != 0 and "AssertionError" in result.stderr
+
+
+def test_ac_113_demonstracao_detecta_regressao_e_correcao():
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run([sys.executable, str(root / "scripts/demo.py")], cwd=root,
+                            capture_output=True, encoding="utf-8", timeout=120,
+                            env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+    assert result.returncode == 0, result.stderr
+    assert "AC-003" in result.stdout and "REPROVADO" in result.stdout
+    assert "Demonstração aprovada" in result.stdout

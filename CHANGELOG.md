@@ -8,6 +8,13 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 
 ### Adicionado
 
+- Versão de desenvolvimento 0.15.0: entradas locais para Codex, Claude Code e Cursor,
+  preservando personalizações; revisões de adequação com hashes e evidências;
+  lições propostas/aceitas com contexto por feature e detecção de referências antigas.
+- Ciclo de propostas com baseline, aplicação validada e arquivamento com check novo.
+- Importação conservadora de cenários Spec Kit/OpenSpec, com fonte e limites explícitos.
+- README em inglês e demonstração executável de regressão e correção.
+
 - `sdd mutate` com operadores ampliados (REQ-033): `*`↔`/`, `%`→`*`, constante inteira
   `n`→`n+1`, remoção de `not` e `!`, `is`↔`is not`, `in`↔`not in` e `return <expr>` →
   `return None`/`undefined`. **Migração:** os novos mutantes podem baixar o score de projetos

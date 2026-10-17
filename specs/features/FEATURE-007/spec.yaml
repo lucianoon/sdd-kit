@@ -30,7 +30,8 @@ requirements:
   - id: AC-062
     given: um esqueleto recém-gerado
     when: sdd validate roda
-    then: cada campo PREENCHER é apontado com arquivo e linha, e o esqueleto preenchido valida
+    then: cada campo PREENCHER é apontado com arquivo e linha, e o esqueleto preenchido
+      valida
 - id: REQ-021
   description: Adoção gradual — começar mínimo e ligar camadas quando fizerem sentido.
   acceptance:
@@ -41,12 +42,13 @@ requirements:
   - id: AC-084
     given: sdd init com preset padrao ou completo
     when: o projeto é criado
-    then: as camadas do preset ficam ligadas em arquivos, config, CI e AGENTS.md, e o projeto valida
+    then: as camadas do preset ficam ligadas em arquivos, config, CI e AGENTS.md,
+      e o projeto valida
   - id: AC-085
     given: um projeto existente
     when: sdd enable liga camadas
-    then: arquivos, config e seções do AGENTS.md são acrescentados uma única vez; camada inexistente é
-      erro
+    then: arquivos, config e seções do AGENTS.md são acrescentados uma única vez;
+      camada inexistente é erro
     forbidden:
     - sobrescrever arquivo existente
     - duplicar chave ou seção ao repetir o comando
@@ -60,16 +62,18 @@ requirements:
   - id: AC-100
     given: um projeto inicializado e a CLI instalada
     when: os comandos e instruções são consultados
-    then: analyze e guide estão disponíveis em Markdown ou JSON e AGENTS.md orienta análise antes de implementar
-      e convergência após implementar
+    then: analyze e guide estão disponíveis em Markdown ou JSON e AGENTS.md orienta
+      análise antes de implementar e convergência após implementar
 - id: REQ-032
   description: Preparar distribuição verificável antes da publicação.
   acceptance:
   - id: AC-113
     given: wheel e sdist produzidos pelo projeto
     when: o smoke test de distribuição é executado
-    then: o pacote instalado expõe CLI, catálogo, análise e guia; release exige tag igual à versão e sucesso
-      da validação antes de publicar
+    then: o pacote instalado expõe CLI, catálogo, análise e guia; release exige tag
+      igual à versão e sucesso da validação antes de publicar; integrações e importação
+      estão presentes no wheel; demonstração executável detecta regressão e verifica
+      a correção
 design:
   numbers:
   - metric: specs por projeto
@@ -158,3 +162,4 @@ paths:
 - src/sdd/layers.py
 - src/sdd/__init__.py
 - scripts/smoke_dist.py
+- scripts/demo.py

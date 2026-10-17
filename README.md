@@ -1,5 +1,7 @@
 # sdd-kit
 
+Português · [English](README.en.md)
+
 [![ci](https://github.com/lucianoon/sdd-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianoon/sdd-kit/actions/workflows/ci.yml)
 
 **Specification-Driven Development para desenvolvimento assistido por IA, com verificação
@@ -100,6 +102,22 @@ com `not_applicable` + motivo; "acho que cobre" não satisfaz. O `sdd profile` m
 matriz com o estado real de cada evidência. Detalhes e tabela completa em
 [`docs/agentes.md`](docs/agentes.md).
 
+## Complementos para o fluxo
+
+```bash
+sdd integrate all                          # entradas locais para Codex, Claude Code e Cursor
+sdd adequacy template criar-pedido         # revisão separada da adequação dos testes
+sdd lesson list                            # lições propostas e aceitas
+sdd change propose ajustar-pedido --feature criar-pedido --reason 'Nova regra'
+sdd import-spec referencias/spec.md --format speckit --feature pagamentos
+```
+
+Revisões usam referências com hashes; lições aceitas atuais entram no `guide`.
+Propostas preservam baseline e histórico; arquivar exige `check` novo. Importações de
+Spec Kit/OpenSpec são rascunhos com fonte preservada e revisão obrigatória.
+Veja [complementos e limites](docs/complementos.md) e a
+[demonstração executável de falha e correção](docs/demonstracao.md).
+
 ## Comandos
 
 | Comando | O que faz |
@@ -155,8 +173,8 @@ O `AGENTS.md` gerado ensina esse ciclo ao agente, com o que fazer e o que não f
 - [Configuração](docs/configuracao.md): todas as chaves e camadas
 - [Limites, origem e créditos](docs/limites-e-creditos.md)
 
-Este repositório verifica a si mesmo com dez specs: verificação, diff, mutação, evals,
-arquitetura, governança, adoção, perfil de agentes, fluxo guiado e artefatos. `sdd validate` mostra a contagem
+Este repositório verifica a si mesmo com onze specs: verificação, diff, mutação, evals,
+arquitetura, governança, adoção, perfil de agentes, fluxo guiado, artefatos e complementos. `sdd validate` mostra a contagem
 atual de critérios; `sdd check` roda os testes, a constituição e as regras de arquitetura.
 
 Os relatórios JSON e Markdown identificam a versão do kit, o formato e o comando.

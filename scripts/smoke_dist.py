@@ -38,6 +38,14 @@ def smoke(wheel: Path) -> None:
         assert report["ok"] and report["summary"]["features"] == 1, report
         packet = json.loads(run("guide", "exemplo", "--stage", "plan", "--json"))
         assert packet["feature"] == "exemplo" and packet["stage"] == "plan", packet
+        run("integrate", "all")
+        assert (project / ".agents/skills/sdd-plan/SKILL.md").is_file()
+        run("adequacy", "template", "exemplo")
+        assert (project / "specs/reviews/exemplo.yaml").is_file()
+        source = project / "foreign.md"
+        source.write_text("### Requirement: Example\n#### Scenario: Valid\n- **WHEN** invoked\n- **THEN** returns a value\n", encoding="utf-8")
+        imported = json.loads(run("import-spec", "foreign.md", "--format", "openspec", "--feature", "foreign"))
+        assert imported["status"] == "draft" and (project / imported["draft"]).is_file()
         catalog = run("profile", "--catalog")
         assert "N-01" in catalog and "P-01" in catalog, catalog
         print(f"{version}: wheel instalado, CLI, catálogo, analyze e guide aprovados")
