@@ -158,6 +158,13 @@ O `AGENTS.md` gerado ensina esse ciclo ao agente, com o que fazer e o que não f
 | Bug (código descumpre spec correta) | `SDD-Fix: AC-012` + teste de regressão que cite o ID |
 | Só a solução técnica mudou | `SDD-No-Spec-Change(nome-da-feature): <motivo>` |
 
+## Exemplos de IA sem ampliar o núcleo
+
+[`examples/rag`](examples/rag/) demonstra recuperação autorizada, revogação de cache,
+fallback, orçamentos, traces, manifesto reproduzível e comparação de avaliações usando
+`check`, `eval` e gates existentes. É offline: não mede qualidade ou latência de um LLM.
+Veja também a [avaliação de complexidade e regra de simplicidade](docs/simplicidade.md).
+
 ## Documentação
 
 - [Changelog](CHANGELOG.md): o que mudou em cada versão

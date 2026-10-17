@@ -79,3 +79,10 @@ O JSON registra `probabilistic: true` e o Markdown marca o resultado como
 
 `sdd eval` fica fora do `sdd check` porque chama APIs de LLM (custo, tempo, segredo).
 O workflow gerado traz o passo comentado.
+
+## Exemplo reproduzível e comparação
+
+[examples/rag](../examples/rag/README.md) fornece um harness offline com manifesto de
+inputs e artefatos, comparação pareada por caso/categoria e auditoria de traces.
+A comparação complementa os limites absolutos de eval; não mede significância estatística.
+O benchmark calcula p95 fora do agregador de médias, com alcance de fixture declarado.

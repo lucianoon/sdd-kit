@@ -1,0 +1,105 @@
+feature: rag-offline
+version: 1
+size: medium
+summary: Exemplo verificável de RAG offline; não mede qualidade de LLM.
+requirements:
+- id: REQ-001
+  description: Isolar recuperação e citações por autorização
+  acceptance:
+  - id: AC-001
+    given: corpus de dois tenants
+    when: uma pergunta é respondida
+    then: retorna somente documento permitido e sua versão
+- id: REQ-002
+  description: Invalidar cache e recusar fontes insuficientes
+  acceptance:
+  - id: AC-002
+    given: resposta em cache e fonte alterada, excluída ou revogada
+    when: a pergunta é repetida
+    then: cache respeita corpus e permissões atuais e não inventa resposta
+- id: REQ-003
+  description: Manter contratos em fallback
+  acceptance:
+  - id: AC-003
+    given: renderer primário indisponível
+    when: fallback é usado
+    then: mantém a resposta e citações permitidas ou recusa quando ambos falham
+- id: REQ-004
+  description: Verificar trajetória e limites
+  acceptance:
+  - id: AC-004
+    given: traces emitidos e limites de trabalho, tempo e custo
+    when: a execução e auditoria acontecem
+    then: limita passos e chamadas e detecta ordem, efeito, custo ou tenant inválido
+- id: REQ-005
+  description: Registrar avaliação reproduzível
+  acceptance:
+  - id: AC-005
+    given: dataset, corpus, config e código locais
+    when: o harness roda
+    then: grava hashes, versões, resultados por caso e traces sem conteúdo de perguntas
+      e respostas
+- id: REQ-006
+  description: Comparar snapshots compatíveis
+  acceptance:
+  - id: AC-006
+    given: baseline e candidata do mesmo experimento
+    when: a comparação roda
+    then: detecta regressões por caso e categoria e recusa dados incompatíveis ou
+      alterados
+- id: REQ-007
+  description: Calcular percentil de latência
+  acceptance:
+  - id: AC-007
+    given: tempos medidos das fixtures
+    when: benchmark calcula p95
+    then: usa percentil explícito e não anuncia TTFT ou desempenho de LLM
+paths:
+- pipeline.py
+- evaluate.py
+- config.json
+- prompt.txt
+evals:
+- id: EVAL-001
+  metric: outcome_exact_match
+  dataset: cases.jsonl
+  min_cases: 7
+  runs: 3
+  aggregate: mean_score
+  threshold:
+    min: 1
+  judge: deterministic
+- id: EVAL-002
+  metric: retrieval_correctness
+  dataset: cases.jsonl
+  min_cases: 7
+  runs: 3
+  aggregate: mean_score
+  threshold:
+    min: 1
+  judge: deterministic
+- id: EVAL-003
+  metric: trajectory_policy
+  dataset: cases.jsonl
+  min_cases: 7
+  runs: 3
+  aggregate: mean_score
+  threshold:
+    min: 1
+  judge: deterministic
+- id: EVAL-004
+  metric: citation_validity
+  dataset: cases.jsonl
+  min_cases: 7
+  runs: 3
+  aggregate: mean_score
+  threshold:
+    min: 1
+  judge: deterministic
+out_of_scope:
+- Qualidade de modelo generativo, embeddings ou busca semântica
+- Garantias estatísticas com sete casos artificiais
+- Observabilidade de produção ou validação criptográfica da identidade do emissor
+
+quality_gates:
+- local-latency

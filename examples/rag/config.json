@@ -1,0 +1,1 @@
+{"provider":"offline-fixture","model":"source-quote-v1","judge":"deterministic-exact-match-v1","retrieval":"lexical-top1-v1","limits":{"max_calls":3,"max_steps":4,"deadline_ms":1000,"max_cost_usd":0}}

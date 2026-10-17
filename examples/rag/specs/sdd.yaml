@@ -1,0 +1,8 @@
+version: 1
+tests:
+  command: python -m pytest -q --junitxml=.sdd/junit.xml test
+  junit: .sdd/junit.xml
+gates:
+  local-latency: python evaluate.py run && python evaluate.py benchmark .sdd/evals --max-p95-ms 1000
+evals:
+  command: python evaluate.py run

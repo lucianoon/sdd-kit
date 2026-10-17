@@ -1,0 +1,3 @@
+Fixture contract: quote the selected authorized, active document with its version.
+Without evidence or an available renderer, abstain. Never perform external writes.
+This is the contract of a deterministic renderer, not a tested LLM prompt.
