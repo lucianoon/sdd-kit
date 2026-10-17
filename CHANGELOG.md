@@ -28,6 +28,8 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 
 ### Modificado
 
+- O workflow gerado por `sdd init` usa `actions/checkout@v7` e `actions/setup-python@v7`,
+  as mesmas versões do CI do kit.
 - Nome do pacote no PyPI: `sdd-kit` → **`sdd-kit-ai`** — o nome antigo está ocupado no
   PyPI por outro projeto (VS Code/Copilot). O comando `sdd`, o módulo `sdd` e a
   instalação pela fonte continuam iguais.
