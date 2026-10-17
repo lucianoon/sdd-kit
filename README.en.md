@@ -10,8 +10,12 @@ high-risk decisions.
 
 ## Start
 
+The CLI is `sdd`. The package name in `pyproject.toml` is `sdd-kit-ai`.
+
 ```bash
-pipx install sdd-kit-ai
+pipx install git+https://github.com/lucianoon/sdd-kit    # from source, works today
+uv tool install git+https://github.com/lucianoon/sdd-kit # equivalent with uv
+# pipx install sdd-kit-ai                                # PyPI, when published
 sdd init
 sdd specify create-order --acs 2
 # Fill the generated specification and write tests with AC IDs in their names.
@@ -21,11 +25,7 @@ sdd integrate all   # optional local entry points for Codex, Claude Code and Cur
 ```
 
 Python 3.10+. Test runners must produce JUnit XML. Working examples cover pytest,
-Jest, Vitest and Go. Install from Git for features not yet released to PyPI:
-
-```bash
-pipx install git+https://github.com/lucianoon/sdd-kit
-```
+Jest, Vitest and Go.
 
 ## What it checks
 

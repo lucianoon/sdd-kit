@@ -48,6 +48,9 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 
 ### Corrigido
 
+- README apresentava `pipx install sdd-kit-ai` como instalação atual do PyPI, mas o
+  pacote ainda não existe lá. A instalação documentada passa a ser pela fonte
+  (`pipx`/`uv`); o comando do PyPI fica só como previsão.
 - `sdd mutate` tratava `//` como comentário em Python (divisão inteira escondia o resto da
   linha da mutação) e `#` como comentário em JS/TS (campos privados).
 - `<` e `>` de tipos genéricos e tags JSX viravam mutantes que só quebravam a compilação e
