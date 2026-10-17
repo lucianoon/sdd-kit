@@ -1,0 +1,72 @@
+# Loop de agentes do loopway sobre este repositório (ver loopway.toml).
+#
+# Entrada:
+#   - PR de spec com a label loop:ready → o loop implementa na mesma branch
+#   - issue com loop:ready e a linha `fix: AC-NNN` → o loop abre um PR de correção
+#
+# Secrets:
+#   ANTHROPIC_API_KEY
+#   LOOPWAY_PAT  fine-grained: Contents, Issues e Pull requests (escrita) neste repo e
+#                Contents (leitura) em lucianoon/loopway-ai. Com o GITHUB_TOKEN, os
+#                pushes do loop não disparariam o workflow `ci` nos PRs dele.
+# Pausa sem mexer no código: variável LOOPWAY_STOP=1 ou uma issue com a label loop:stop.
+name: loopway
+
+on:
+  schedule:
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+    inputs:
+      number:
+        description: "Executar só este PR ou issue da fila (opcional)"
+        required: false
+
+concurrency:
+  group: loopway
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.LOOPWAY_PAT }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      LOOPWAY_STOP: ${{ vars.LOOPWAY_STOP }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.LOOPWAY_PAT }}
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v7
+        with: { node-version: "22" }
+      - name: Instalar ferramentas
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          pip install -e ".[dev]"
+          pip install "loopway-ai @ git+https://x-access-token:${{ secrets.LOOPWAY_PAT }}@github.com/lucianoon/loopway-ai"
+          git config user.name "loopway[bot]"
+          git config user.email "loopway@users.noreply.github.com"
+      - name: Rodar loop
+        run: |
+          if [ -n "${{ inputs.number }}" ]; then
+            loopway implement "${{ inputs.number }}"
+          else
+            loopway run
+          fi
+      - name: Resumo
+        if: always()
+        run: loopway status >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Guardar trilha de auditoria
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: loopway-audit-${{ github.run_id }}
+          path: .loopway/*.jsonl
+          if-no-files-found: ignore
+          retention-days: 90
