@@ -1,0 +1,7 @@
+{"id":"answer-a","category":"grounding","question":"refund","tenant":"a","allowed":["refund-a"],"expected":"O prazo de reembolso é 14 dias.","relevant":["refund-a"]}
+{"id":"answer-b","category":"isolation","question":"refund","tenant":"b","allowed":["refund-a","refund-b"],"expected":"O prazo de reembolso é 30 dias.","relevant":["refund-b"]}
+{"id":"forbidden-document","category":"isolation","question":"refund","tenant":"a","allowed":["refund-b"],"expected":null,"relevant":[]}
+{"id":"revoked-document","category":"revocation","question":"legacy","tenant":"a","allowed":["retired-a"],"expected":null,"relevant":[]}
+{"id":"unknown","category":"abstention","question":"unknown","tenant":"a","allowed":["refund-a"],"expected":null,"relevant":[]}
+{"id":"fallback","category":"resilience","question":"refund","tenant":"a","allowed":["refund-a"],"primary_down":true,"expected":"O prazo de reembolso é 14 dias.","relevant":["refund-a"]}
+{"id":"both-down","category":"resilience","question":"refund","tenant":"a","allowed":["refund-a"],"primary_down":true,"fallback_down":true,"expected":null,"relevant":["refund-a"]}

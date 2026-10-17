@@ -1,0 +1,5 @@
+[
+  {"id":"refund-a","tenant":"a","version":2,"active":true,"keywords":["refund","prazo"],"text":"O prazo de reembolso é 14 dias."},
+  {"id":"refund-b","tenant":"b","version":1,"active":true,"keywords":["refund","prazo"],"text":"O prazo de reembolso é 30 dias."},
+  {"id":"retired-a","tenant":"a","version":1,"active":false,"keywords":["legacy"],"text":"Condição revogada."}
+]

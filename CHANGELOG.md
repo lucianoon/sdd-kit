@@ -8,6 +8,11 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 
 ### Adicionado
 
+- Exemplo RAG offline com isolamento, cache, fallback, orçamentos e traces; avaliação
+  reproduzível com manifesto e comparação pareada, usando comandos e gates existentes.
+- Avaliação de complexidade e critérios de simplicidade; nenhum comando público,
+  schema central ou dependência de runtime acrescentado nesta entrega.
+
 - Versão de desenvolvimento 0.15.0: entradas locais para Codex, Claude Code e Cursor,
   preservando personalizações; revisões de adequação com hashes e evidências;
   lições propostas/aceitas com contexto por feature e detecção de referências antigas.

@@ -66,6 +66,15 @@ jobs:
       - name: pytest
         working-directory: examples/pytest
         run: sdd check
+      - name: RAG offline, evals, manifesto e comparação
+        working-directory: examples/rag
+        run: |
+          sdd validate
+          sdd check
+          sdd eval
+          python evaluate.py run --out .sdd/baseline
+          python evaluate.py compare .sdd/baseline .sdd/evals
+          python evaluate.py benchmark .sdd/evals --max-p95-ms 1000
       - name: multi (2 features)
         working-directory: examples/multi
         run: sdd check

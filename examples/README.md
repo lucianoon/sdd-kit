@@ -5,6 +5,7 @@ Cada pasta é um projeto sdd independente, verificado no CI a cada commit
 
 | Pasta | Runner | Como o JUnit é gerado | Convenções de nome reconhecidas |
 |---|---|---|---|
+| `rag/` | pytest + EVALs offline | `--junitxml` + harness JSONL | RAG autorizado, traces, manifesto e comparação de versões |
 | `pytest/` | pytest 8+ | `--junitxml` | `test_ac_001_...`, `def testAC001`, IDs em parametrize |
 | `multi/` | pytest 8+ | `--junitxml` | duas specs independentes (`pedidos`, `fretes`) com código realmente acoplado |
 | `jest/` | jest 30 | jest-junit 17 | `it("AC-001 ...")`, `describe("AC-003 ...")`, `test.each("AC-004 ...")` |

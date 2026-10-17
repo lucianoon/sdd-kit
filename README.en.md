@@ -61,3 +61,10 @@ also checks its own specifications and includes package-installation smoke tests
 MIT. Original implementation with ideas credited to GitHub Spec Kit, OpenSpec,
 TLC Spec-Driven and the author's SDD guide and agent requirements catalog.
 See [credits](docs/limites-e-creditos.md).
+
+## Offline AI example
+
+[examples/rag](examples/rag/) demonstrates authorized retrieval, cache invalidation,
+fallback, trace policies, budgets and reproducible evaluation snapshots using existing
+commands. No new runtime dependencies or real model calls; fixture results are not LLM
+quality evidence. See the [scope and simplicity assessment](docs/simplicidade.md).
