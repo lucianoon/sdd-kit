@@ -1,0 +1,142 @@
+feature: revisao-escalonada
+version: 1
+size: large
+summary: Escalonar a revisão humana pelo risco da mudança com piso determinístico e tratar
+  achados de revisor LLM como evidência probabilística que só eleva o rigor.
+assumptions:
+- assumption: o kit não sabe quem aprovou um PR na forja
+  chosen: a contagem de aprovações de pessoas chega por --approvals, calculada pelo CI
+  rationale: consultar a API da forja acoplaria o kit a um provedor e a credenciais
+- assumption: maioria simples define consenso entre verificadores
+  chosen: um achado tem consenso quando votes é maior que metade de voters
+  rationale: é a regra mais simples verificável sem conhecer o harness de votação
+open_questions: []
+decisions:
+- AD-005
+- AD-007
+out_of_scope:
+- Executar revisor LLM, classificador ou votação de verificadores
+- Consultar a API da forja ou autenticar quem aprovou
+- Inferir risco semântico de uma mudança sem regra declarada
+requirements:
+- id: REQ-039
+  description: Calcular o piso de risco de uma mudança e as aprovações humanas que ela exige.
+  acceptance:
+  - id: AC-126
+    given: arquivos alterados desde a base, review.tiers, review.default_tier, specs donas com
+      riscos e arquivos em specs/
+    when: sdd risk calcula o tier
+    then: cada arquivo recebe o maior tier entre glob casado ou default, mínimo medium em specs/,
+      high em specs/sdd.yaml e a severidade dos riscos da spec dona, com motivos; a mudança recebe o maior tier e
+      review.approvals define as aprovações exigidas; approvals incompleto ou decrescente é
+      erro de config
+    forbidden:
+    - inferir risco por conteúdo do diff ou por modelo
+  - id: AC-127
+    given: escalações em review.escalations, review.trusted_authors e --approvals
+    when: sdd risk aplica entradas externas e compara aprovações
+    then: escalação acima do tier atual eleva e fica registrada; igual ou abaixo é ignorada com
+      motivo; autor fora da lista exige no mínimo 1 aprovação; sem --approvals o resultado é
+      informativo com código 0; aprovações insuficientes retornam código 1; arquivo de
+      escalação inválido retorna código 2
+    forbidden:
+    - uma escalação reduzir o tier ou as aprovações exigidas
+- id: REQ-040
+  description: Validar achados de revisor LLM externo como evidência probabilística.
+  acceptance:
+  - id: AC-128
+    given: review.findings ausente, presente sem review.allow_llm_findings ou presente com política
+    when: sdd findings valida o registro
+    then: ausência é estado AUSENTE com código 0; sem política reprova; o relatório marca a
+      evidência como probabilística e counts_as_human_approval falso
+    forbidden:
+    - tratar achado de LLM como aprovação humana
+  - id: AC-129
+    given: achados com severidade, votos, rodada, status, disposition e hashes dos arquivos revisados
+    when: sdd findings verifica bloqueios e convergência
+    then: reprova achado important aberto com maioria de votos, arquivo revisado alterado, ID
+      repetido, mesma mensagem no mesmo arquivo com outro ID e rodada acima de
+      review.max_rounds; pre_existing, nit e achado sem consenso não bloqueiam; descartado
+      exige disposition e reason; o resumo conta destinos para medir ruído
+- id: REQ-041
+  description: Exportar correções registradas como casos para avaliar revisores.
+  acceptance:
+  - id: AC-130
+    given: histórico git com commits que têm o trailer SDD-Fix e outros que não têm
+    when: sdd fixes exporta o intervalo
+    then: lista só commits com SDD-Fix, com critérios, features donas, arquivos e testes do
+      commit; critério inexistente reprova com código 1; o relatório declara que um caso não
+      comprova detecção
+design:
+  numbers:
+  - metric: arquivos alterados por mudança
+    max: 5000
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: git, config e arquivos JSON de escalação e achados
+      source: repositório do projeto e harness externo
+      frequency: por chamada
+    egress:
+    - to: relatório JSON e Markdown em .sdd/
+      consumers:
+      - CLI
+      - CI
+      - loop de agentes
+      freshness: estado atual dos arquivos
+  alternatives:
+  - name: Piso determinístico no kit e entradas externas que só elevam
+    chosen: true
+    why: mantém o veredito reproduzível e auditável e ainda aproveita classificadores e revisores
+      LLM onde eles enxergam risco semântico
+  - name: Classificador ou revisor LLM dentro do kit decidindo o tier
+    chosen: false
+    why_not: tornaria o veredito não reproduzível e exigiria SDK de modelo, contra AD-005 e ARCH-003
+  risks:
+  - area: security
+    severity: high
+    description: entrada externa ou config afrouxa a revisão de uma mudança sensível
+    mitigated_by:
+    - AC-126
+    - AC-127
+  - area: data_integrity
+    severity: medium
+    description: achados antigos ou repetidos aprovam ou travam uma mudança que já mudou
+    mitigated_by:
+    - AC-129
+  dependencies: []
+tasks:
+- id: T-039
+  title: Calcular piso de risco e aprovações exigidas com entradas que só elevam.
+  origin:
+  - REQ-039
+  done_when: AC-126 e AC-127 passam com cenários positivos e negativos
+  evidence:
+  - AC-126
+  - AC-127
+  status: done
+- id: T-040
+  title: Validar achados de revisor LLM como evidência probabilística e convergente.
+  origin:
+  - REQ-040
+  done_when: AC-128 e AC-129 passam com cenários positivos e negativos
+  evidence:
+  - AC-128
+  - AC-129
+  status: done
+- id: T-041
+  title: Exportar correções SDD-Fix como casos de avaliação.
+  origin:
+  - REQ-041
+  done_when: AC-130 passa com cenários positivos e negativos
+  evidence:
+  - AC-130
+  status: done
+invariants:
+- Nenhuma entrada externa reduz o piso calculado por regras declaradas.
+- Aprovação de agente nunca é contada como aprovação humana.
+quality_gates:
+- compila
+paths:
+- src/sdd/governance.py

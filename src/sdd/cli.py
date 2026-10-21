@@ -412,6 +412,89 @@ def integrate(
         typer.echo(path)
 
 
+@app.command(name="risk")
+def risk_cmd(
+    base: str = typer.Option("origin/main", "--base", "-b", help="Ref de comparação (branch alvo do PR)."),
+    author: str = typer.Option(None, "--author", help="Autor da mudança, comparado a review.trusted_authors."),
+    approvals: int = typer.Option(None, "--approvals", min=0,
+                                  help="Aprovações de PESSOAS já dadas; sem isto o resultado é informativo."),
+    as_json: bool = typer.Option(False, "--json", help="Imprime o relatório em JSON."),
+    root: Path = Root,
+):
+    """Calcula o piso de risco da mudança e quantas aprovações humanas ela exige.
+
+    O piso vem de review.tiers, dos riscos das specs donas e de specs/. Escalações externas
+    (review.escalations) só elevam o tier. Aprovação de agente não conta.
+    """
+    from .diff import GitError, changes
+    from .governance import risk, render_risk
+    from .report import write_command_report
+
+    proj = _load_or_exit(root)
+    try:
+        changed, _, _ = changes(root, base)
+    except GitError as exc:
+        _err(exc)
+        raise typer.Exit(2)
+    rep = risk(proj, changed, author, approvals)
+    write_command_report(root, "risk", rep, render_risk(rep))
+    if as_json:
+        typer.echo(json.dumps(rep, ensure_ascii=False, indent=2))
+    else:
+        for f in rep["files"]:
+            _row(f["tier"], f"{f['path']}  ({'; '.join(f['reasons'])})", 7)
+        for e in rep["escalations"]["applied"]:
+            _warn(f"escalado para {e['tier']} por {e['source']}: {e['reason']}")
+        for n in rep["notes"]:
+            _warn(n)
+        typer.echo(f"\ntier {rep['tier']} (piso {rep['floor']}): "
+                   f"{rep['required_approvals']} aprovação(ões) humana(s) exigida(s)")
+        if approvals is not None:
+            _verdict(rep["ok"], f"{approvals} de {rep['required_approvals']} aprovação(ões) humana(s)")
+    raise typer.Exit(0 if rep["ok"] else 1)
+
+
+@app.command(name="findings")
+def findings_cmd(
+    as_json: bool = typer.Option(False, "--json", help="Imprime o relatório em JSON."),
+    root: Path = Root,
+):
+    """Valida achados de um revisor LLM externo como evidência probabilística.
+
+    Reprova achado important aberto com consenso, revisão desatualizada, achado repetido
+    e rodada acima de review.max_rounds. Não executa o revisor nem aprova a mudança.
+    """
+    from .governance import findings, render_findings
+    from .report import write_command_report
+
+    proj = _load_or_exit(root)
+    rep = findings(proj)
+    write_command_report(root, "findings", rep, render_findings(rep))
+    if as_json:
+        typer.echo(json.dumps(rep, ensure_ascii=False, indent=2))
+    elif rep["state"] == "AUSENTE":
+        typer.echo(f"nenhum achado de revisor LLM em {rep['source']}")
+    else:
+        for p in rep["problems"]:
+            _err(p)
+        _verdict(rep["ok"], "evidência probabilística; não conta como aprovação humana")
+    raise typer.Exit(0 if rep["ok"] else 1)
+
+
+@app.command(name="fixes")
+def fixes_cmd(
+    base: str = typer.Option(None, "--base", "-b", help="Só commits depois desta ref."),
+    root: Path = Root,
+):
+    """Exporta commits com SDD-Fix como casos para avaliar revisores (JSON)."""
+    from .governance import fixes
+
+    proj = _load_or_exit(root)
+    rep = fixes(proj, base)
+    typer.echo(json.dumps(rep, ensure_ascii=False, indent=2))
+    raise typer.Exit(0 if rep["ok"] else 1)
+
+
 @app.command(name="cite")
 def cite_cmd(reference: str = typer.Argument(..., help="arquivo:linha"), root: Path = Root):
     """Produz referência com hash para revisão ou lição (não executa testes)."""

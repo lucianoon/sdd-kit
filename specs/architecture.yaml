@@ -24,6 +24,7 @@ rules:
       - src/sdd/learning.py
       - src/sdd/changes.py
       - src/sdd/adapters.py
+      - src/sdd/governance.py
     forbid: [typer, click]
     forbid_paths: [src/sdd/cli]
   - id: ARCH-002

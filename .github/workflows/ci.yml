@@ -46,9 +46,15 @@ jobs:
       - run: sdd check
       - if: github.event_name == 'pull_request'
         run: sdd mutate --base "origin/${{ github.base_ref }}"
+      # Informativo: tier e aprovações humanas exigidas. Não bloqueia; a branch protection decide.
+      - if: github.event_name == 'pull_request'
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE: ${{ github.base_ref }}
+        run: sdd risk --base "origin/$BASE" --author "$AUTHOR"
       - if: always()
         shell: bash
-        run: cat .sdd/analyze.md .sdd/report.md .sdd/mutation.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        run: cat .sdd/analyze.md .sdd/report.md .sdd/mutation.md .sdd/risk.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
   # Prova de agnosticismo: o rastreio funciona com os runners reais de outras stacks.
   exemplos:

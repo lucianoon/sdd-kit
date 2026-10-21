@@ -29,6 +29,13 @@ requirements:
     when: adequacy verifica uma revisão
     then: exige cobertura integral, revisores declarados distintos e referências atuais;
       mudanças de spec, código ou teste invalidam a revisão sem executar testes
+  - id: AC-131
+    given: feature com risco high na spec ou listada em review.human_adequacy
+    when: adequacy verifica uma revisão com reviewer_kind agent
+    then: reprova com o motivo da exigência; com reviewer_kind human a exigência é atendida;
+      o relatório marca a evidência como humana declarada ou probabilística
+    forbidden:
+    - revisão de agente substituir revisor humano exigido
 - id: REQ-036
   description: Aprender com lições revisadas e limitadas ao escopo.
   acceptance:
@@ -106,9 +113,10 @@ tasks:
   title: Registrar adequação semântica dos testes separadamente da execução.
   origin:
   - REQ-035
-  done_when: AC-122 passa com cenários positivos e negativos
+  done_when: AC-122 e AC-131 passam com cenários positivos e negativos
   evidence:
   - AC-122
+  - AC-131
   status: done
 - id: T-036
   title: Aprender com lições revisadas e limitadas ao escopo.

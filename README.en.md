@@ -41,10 +41,16 @@ Jest, Vitest and Go.
 | `lesson` | Proposed and explicitly accepted local lessons |
 | `change` | Propose, inspect, apply and archive changes to an existing spec |
 | `import-spec` | Conservative Spec Kit/OpenSpec Markdown drafts with provenance |
+| `risk` | Change risk tier and required human approvals from declared rules |
+| `findings` | External LLM reviewer findings as probabilistic evidence |
+| `fixes` | `SDD-Fix` commits exported as reviewer evaluation cases |
 
 Choose `minimo`, `padrao` or `completo` presets and enable layers incrementally.
 The verifier uses commands and JUnit instead of model SDKs. Agent instructions and
-semantic reviews remain distinct from executed evidence.
+semantic reviews remain distinct from executed evidence. Review tiers come from
+declared rules; an external classifier or LLM reviewer may only raise them, and an
+agent approval never counts as a human one ([risk-tiered review](docs/revisao.md),
+in Portuguese).
 
 A passing named test does not prove it tests the intended requirement. Mutation is
 lexical, architecture checks have language-specific limits, and eval quality depends

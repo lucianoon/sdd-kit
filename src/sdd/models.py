@@ -451,6 +451,38 @@ class Config(Strict):
     small_max_files: int = Field(3, ge=1)
     mutation: MutationConfig = Field(default_factory=lambda: MutationConfig())
     evals: EvalsConfig = Field(default_factory=lambda: EvalsConfig())
+    review: ReviewConfig = Field(default_factory=lambda: ReviewConfig())
+
+
+Tier = Literal["low", "medium", "high"]
+TIERS: tuple[str, ...] = ("low", "medium", "high")  # ordem crescente de rigor
+
+
+class ReviewConfig(Strict):
+    """Revisão escalonada por risco (AD-007). O piso vem de regras declaradas; entradas
+    externas, como um classificador ou revisor LLM, só elevam o rigor."""
+    # Globs por tier. Entre os arquivos alterados, o maior tier vence.
+    tiers: dict[Tier, list[str]] = {}
+    default_tier: Tier = "medium"  # arquivo alterado que não casa nenhum glob
+    approvals: dict[Tier, int] = {"low": 0, "medium": 1, "high": 2}  # aprovações humanas por tier
+    # Autores com caminho leve. Lista vazia: sem restrição; fora da lista, mínimo de 1 aprovação.
+    trusted_authors: list[str] = []
+    escalations: ProjectPath = ".sdd/review/escalations.json"  # pedidos externos para elevar
+    # Política: achados de revisor LLM só são aceitos como evidência se isto for true.
+    allow_llm_findings: bool = False
+    findings: ProjectPath = ".sdd/review/findings.json"
+    max_rounds: int = Field(3, ge=1)  # teto de rodadas revisão/correção antes de rever a abordagem
+    # Features (nome ou glob) cuja revisão de adequação exige revisor humano.
+    human_adequacy: list[str] = []
+
+    @model_validator(mode="after")
+    def _aprovacoes(self):
+        if set(self.approvals) != set(TIERS):
+            raise ValueError("approvals precisa declarar low, medium e high")
+        values = [self.approvals[t] for t in TIERS]
+        if any(v < 0 for v in values) or values != sorted(values):
+            raise ValueError("approvals não pode ser negativo nem diminuir com o tier")
+        return self
 
 
 class EvalsConfig(Strict):

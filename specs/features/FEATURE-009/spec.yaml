@@ -53,6 +53,13 @@ requirements:
     then: não altera fontes nem executa comandos do projeto; guide não grava arquivos,
       não reutiliza evidências antigas e rejeita etapa ou feature inexistente ou ambígua
       com código 2
+  - id: AC-132
+    given: etapa converge e review.max_rounds configurado
+    when: o guia é preparado
+    then: as instruções pedem não repetir lacunas de rodadas anteriores, separar o introduzido do
+      pre-existente, apontar a classe do problema, revisar só o diff novo após a primeira rodada
+      e parar em review.max_rounds com o valor configurado; a verificação condicional inclui
+      sdd risk e sdd findings
 design:
   numbers:
   - metric: specs por projeto
@@ -103,11 +110,12 @@ tasks:
   - REQ-024
   depends_on:
   - T-23
-  done_when: AC-097 a AC-099 passam no check
+  done_when: AC-097 a AC-099 e AC-132 passam no check
   evidence:
   - AC-097
   - AC-098
   - AC-099
+  - AC-132
   status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.
