@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 from sdd import core
 from sdd.artifacts import ArtifactError
 from sdd.cli import app
-from sdd.governance import file_tier, findings, fixes, higher, rank, risk
+from sdd.governance import file_tier, findings, fixes, higher, rank, render_risk, risk
 from sdd.learning import adequacy, save
 from sdd.models import ReviewConfig
 from sdd.workflow import build
@@ -185,6 +185,11 @@ def test_ac_127_cli_mostra_escalacao_aplicada(repo_review):
     assert "tier high (piso low)" in result.stdout
     md = (root / ".sdd/risk.md").read_text(encoding="utf-8")
     assert "## Escalações aplicadas" in md and "aprovação de agente não conta" in md
+    (root / ".sdd/review/escalations.json").unlink()
+    proj = setup(root, {**REVIEW, "trusted_authors": ["luciano"]})
+    md = render_risk(risk(proj, ["docs/a.md"], author="bot"))
+    assert md.endswith("## Notas\n\n- autor fora de trusted_authors (ou não informado): mínimo de 1 "
+                       "aprovação humana\n")
 
 
 # --- REQ-040: achados de revisor LLM -------------------------------------------------------
@@ -300,7 +305,11 @@ def test_ac_130_exporta_so_commits_com_sdd_fix(repo_review):
     commit(root, "corrige reserva\n\nSDD-Fix: AC-001, AC-002")
     write(root, "docs/a.md", "x\n")
     commit(root, "docs")
+    write(root, "src/agenda/z.py", "z = 1\n")
+    commit(root, "separador \x1f na mensagem\n\nSDD-Fix: AC-003")
     rep = fixes(core.load(root), base)
+    assert [r["criteria"] for r in rep["fixes"]] == [["AC-003"], ["AC-001", "AC-002"]]
+    rep["fixes"] = rep["fixes"][1:]
     assert rep["ok"] and rep["range"] == f"{base}..HEAD" and len(rep["fixes"]) == 1
     row = rep["fixes"][0]
     assert row["criteria"] == ["AC-001", "AC-002"] and row["features"] == ["agenda"]
