@@ -266,7 +266,10 @@ def fixes(proj: Project, base: str | None = None) -> dict:
         ids = sorted({i for line in FIX_TRAILER.findall(body) for i in CRITERION.findall(line)})
         if not ids:
             continue
-        changed = [f for f in _git(proj.root, "show", "--name-only", "--format=", "-z", sha).split("\0") if f]
+        try:
+            changed = [f for f in _git(proj.root, "show", "--name-only", "--format=", "-z", sha).split("\0") if f]
+        except GitError as exc:
+            raise ArtifactError(str(exc)) from exc
         unknown += [f"{sha[:12]}: {i}" for i in ids if i not in owner]
         rows.append({"commit": sha, "criteria": ids,
                      "features": sorted({owner[i] for i in ids if i in owner}),
