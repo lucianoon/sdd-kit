@@ -82,6 +82,7 @@ def test_ac_034_cli_aprova_e_grava_relatorio(tmp_path):
     r = runner.invoke(app, ["eval", "-C", str(project(tmp_path))])
     assert r.exit_code == 0, r.output
     assert "OK" in r.output and "EVAL-001" in r.output
+    assert r.stdout.startswith("OK              EVAL-001")  # coluna de 15 + espaço
     assert "APROVADO" in (tmp_path / ".sdd/eval.md").read_text(encoding="utf-8")
 
 

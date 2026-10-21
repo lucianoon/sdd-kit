@@ -152,9 +152,18 @@ def test_ac_127_aprovacoes_e_codigos_de_saida(repo_review):
     assert invoke(root, "risk", "--base", "main").exit_code == 2
     write(root, ".sdd/review/escalations.json", '{"version": 1, "escalations": [{"tier": "high", '
           '"reason": "r", "source": "s"}]}')
+    lines = invoke(root, "risk", "--base", "main").stdout.splitlines()
+    assert lines[0] == "high    .github/ci.yml  (review.tiers.high)"  # coluna de 7 + espaço
     escalated = invoke(root, "risk", "--base", "main")
     assert escalated.exit_code == 0 and "escalado para high por s" not in escalated.stdout
     assert invoke(root, "risk", "--base", "inexistente").exit_code == 2
+    (root / ".sdd/review/escalations.json").unlink()
+    write(root, "docs/a.md", "x\n")
+    git(root, "rm", "-q", ".github/ci.yml")
+    commit(root)
+    zero = invoke(root, "risk", "--base", "main", "--approvals", "0")
+    assert zero.exit_code == 0 and "0 de 0 aprovação" in zero.stdout
+    assert invoke(root, "risk", "--base", "main", "--approvals", "-1").exit_code == 2
 
 
 @pytest.fixture
@@ -235,7 +244,9 @@ def test_ac_129_bloqueio_consenso_e_destinos(tmp_path):
     assert s["dismissed_as"] == {"wrong": 1, "intentional": 1, "irrelevant": 0}
     assert s["without_consensus"] == 1 and s["round"] == 1
     assert invoke(tmp_path, "findings").exit_code == 1
-    assert json.loads(invoke(tmp_path, "findings", "--json").stdout)["state"] == "REPROVADO"
+    as_json = invoke(tmp_path, "findings", "--json").stdout
+    assert json.loads(as_json)["state"] == "REPROVADO"
+    assert '"evidence": "probabilística"' in as_json and as_json.startswith('{\n  "report_version"')
     record(tmp_path, [finding("F1", votes=2, voters=4)])
     assert findings(core.load(tmp_path))["ok"]
     record(tmp_path, [finding("F1", votes=3, voters=4)])
@@ -302,6 +313,7 @@ def test_ac_130_exporta_so_commits_com_sdd_fix(repo_review):
     assert not rep["ok"] and rep["problems"][0].endswith(": AC-404")
     result = invoke(root, "fixes", "--base", base)
     assert result.exit_code == 1 and json.loads(result.stdout)["fixes"][0]["criteria"] == ["AC-404"]
+    assert "não comprova" in result.stdout and result.stdout.startswith('{\n  "report_version"')
     with pytest.raises(ArtifactError):
         fixes(core.load(root), "inexistente")
 
