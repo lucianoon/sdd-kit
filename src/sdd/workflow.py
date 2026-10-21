@@ -31,6 +31,8 @@ STAGES = {
         "Não altere a intenção da spec para justificar o código. Proponha tarefas adicionais para lacunas, com IDs novos, origin e done_when; preserve e não renumere tarefas existentes.",
         "Checkbox ou status done não é evidência. Rode sdd check; diff, mutate, arch e eval têm alcance próprio e devem ser executados quando aplicáveis. Identifique o que não foi executado.",
         "Relate lacunas e evidências observadas. Uma revisão do agente não aprova contratos nem demonstra equivalência semântica; preserve a revisão humana onde necessária.",
+        "Para convergir: não repita lacunas já relatadas em rodadas anteriores; separe o que a mudança introduziu do que já existia (pre_existing não bloqueia); aponte a classe do problema para corrigir todas as ocorrências; depois da primeira rodada, revise só o diff novo.",
+        "Respeite review.max_rounds (atual: {max_rounds}); ao atingi-lo, pare e proponha rever a abordagem em vez de outra rodada. Achados de revisor LLM se registram em review.findings e se validam com sdd findings.",
     ],
 }
 
@@ -47,6 +49,7 @@ def build(proj, feature: str, stage: str) -> dict:
     ready = [t.id for t in spec.tasks if t.status != "done" and all(
         any(d.id == dep and d.status == "done" for d in spec.tasks) for dep in t.depends_on)]
     from .learning import context
+    rounds = proj.config.review.max_rounds if proj.config else 3
     lesson_context = context(proj.root, feature)
     return {**metadata("guide"), "lessons": lesson_context, "feature": feature, "stage": stage,
             "status": "BLOQUEADO" if blocked else "ORIENTAÇÃO",
@@ -60,9 +63,11 @@ def build(proj, feature: str, stage: str) -> dict:
             "findings": report["findings"],
             "coverage": [r for r in report["coverage"] if r["source"] == path],
             "ready_tasks": ready if not proj.errors else [],
-            "instructions": list(STAGES[stage]),
+            "instructions": [text.format(max_rounds=rounds) if "{max_rounds}" in text else text
+                             for text in STAGES[stage]],
             "verification": ["sdd validate", "sdd analyze", "sdd check"],
-            "conditional_verification": ["sdd diff --base <ref-alvo>", "sdd mutate", "sdd arch", "sdd eval"]}
+            "conditional_verification": ["sdd diff --base <ref-alvo>", "sdd mutate", "sdd arch", "sdd eval",
+                                         "sdd risk --base <ref-alvo>", "sdd findings"]}
 
 
 def render_markdown(packet: dict) -> str:

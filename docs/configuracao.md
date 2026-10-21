@@ -40,6 +40,17 @@ evals:                     # camada evals
   results_dir: .sdd/evals
   timeout: 3600
   allow_llm_judge: false
+
+review:                    # revisão escalonada por risco; veja revisao.md
+  tiers: {}                # globs por tier: {low: [...], medium: [...], high: [...]}
+  default_tier: medium     # arquivo alterado que não casa nenhum glob
+  approvals: {low: 0, medium: 1, high: 2}   # aprovações humanas; não pode diminuir com o tier
+  trusted_authors: []      # vazio: sem restrição; fora da lista, mínimo de 1 aprovação
+  escalations: .sdd/review/escalations.json # pedidos externos que só elevam o tier
+  allow_llm_findings: false
+  findings: .sdd/review/findings.json       # achados de revisor LLM externo
+  max_rounds: 3            # teto de rodadas revisão/correção
+  human_adequacy: []       # features (nome ou glob) cuja adequação exige revisor humano
 ```
 
 O mutate define `TMPDIR`, `TEMP` e `TMP` privados à cópia, substituindo esses três

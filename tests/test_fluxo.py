@@ -177,7 +177,8 @@ def test_ac_097_contexto_completo_da_feature_e_etapa(tmp_path, stage):
     assert packet["architecture"][0]["from"] == ["src/**"]
     assert packet["config"]["tests"]["command"] and packet["agents_profile"] is None
     assert packet["source"] == SPEC_PATH and len(packet["coverage"]) == 3
-    assert len(packet["instructions"]) == 4 and packet["command"] == "guide"
+    # converge ganhou as instruções de convergência (AC-132)
+    assert len(packet["instructions"]) == (6 if stage == "converge" else 4) and packet["command"] == "guide"
     assert "sdd check" in packet["verification"]
     assert "sdd mutate" in packet["conditional_verification"]
     md = render_guide(packet)

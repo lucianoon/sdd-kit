@@ -67,7 +67,7 @@ LIMITES = {
     "Number.metric": ("min_length", 1), "Number.source": ("min_length", 1),
     "Number.unit": ("min_length", 1), "OpenQuestion.question": ("min_length", 1),
     "Principle.rule": ("min_length", 1), "Requirement.acceptance": ("min_length", 1),
-    "Retry.max_attempts": ("ge", 1), "Risk.description": ("min_length", 1),
+    "Retry.max_attempts": ("ge", 1), "ReviewConfig.max_rounds": ("ge", 1), "Risk.description": ("min_length", 1),
     "Spec.requirements": ("min_length", 1), "Spec.version": ("ge", 1),
     "Task.done_when": ("min_length", 1), "Task.origin": ("min_length", 1),
     "Task.title": ("min_length", 1), "TestsConfig.timeout": ("ge", 1),

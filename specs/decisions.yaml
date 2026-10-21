@@ -33,6 +33,17 @@ decisions:
     rationale: >-
       Distinguir execução, declaração e julgamento probabilístico impede que um
       relatório aprovado sugira garantias além das evidências coletadas.
+  - id: AD-007
+    title: Revisão escalonada por risco com piso determinístico
+    decision: >-
+      O tier de revisão de uma mudança vem de regras declaradas (globs por tier, specs/ e
+      severidade dos riscos das specs donas). Classificadores e revisores LLM externos entram
+      por arquivo e só podem elevar o tier; achados de LLM exigem review.allow_llm_findings e
+      são evidência probabilística. Aprovação de agente nunca conta como aprovação humana.
+    rationale: >-
+      Tier por caminho não enxerga risco semântico, e um modelo enxerga mas varia entre
+      execuções. A assimetria preserva um piso reproduzível e auditável e aproveita o modelo
+      só para apertar a regra, nunca para afrouxá-la.
   - id: AD-006
     title: Separar carregamento, execução e persistência protegida
     decision: >-

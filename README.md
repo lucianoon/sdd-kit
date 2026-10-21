@@ -121,6 +121,19 @@ Spec Kit/OpenSpec são rascunhos com fonte preservada e revisão obrigatória.
 Veja [complementos e limites](docs/complementos.md) e a
 [demonstração executável de falha e correção](docs/demonstracao.md).
 
+## Revisão escalonada por risco
+
+```bash
+sdd risk --base origin/main --author "$AUTOR"   # tier da mudança e aprovações humanas exigidas
+sdd findings                                    # achados de um revisor LLM externo
+sdd fixes --base v0.15.0                        # correções SDD-Fix como casos de avaliação
+```
+
+O piso vem de regras declaradas: globs por tier, `specs/` e a severidade dos riscos das
+specs donas. Um classificador ou revisor LLM externo pode **elevar** o tier por arquivo,
+nunca reduzi-lo. Achados de LLM exigem política explícita, são evidência probabilística e
+não contam como aprovação humana. Veja [revisão escalonada](docs/revisao.md).
+
 ## Comandos
 
 | Comando | O que faz |
@@ -137,6 +150,9 @@ Veja [complementos e limites](docs/complementos.md) e a
 | `sdd eval` | aplica critérios estatísticos a comportamento de LLM |
 | `sdd arch` | verifica as regras de dependência entre camadas |
 | `sdd profile` | mostra a matriz do perfil de agentes |
+| `sdd risk` | calcula o piso de risco da mudança e as aprovações humanas exigidas |
+| `sdd findings` | valida achados de revisor LLM externo como evidência probabilística |
+| `sdd fixes` | exporta commits `SDD-Fix` como casos para avaliar revisores |
 
 ## O ciclo
 
@@ -180,6 +196,7 @@ Veja também a [avaliação de complexidade e regra de simplicidade](docs/simpli
 - [Auditoria de outubro de 2026](docs/auditoria-2026-10.md): achado corrigido, alcance, validação e limites
 - [Comportamento de LLM](docs/evals.md): `eval`, intervalo de confiança, juiz LLM
 - [Perfil de agentes](docs/agentes.md): matriz de módulos, requisitos críticos, LGPD
+- [Revisão escalonada](docs/revisao.md): piso de risco, achados de LLM, correções como eval
 - [Configuração](docs/configuracao.md): todas as chaves e camadas
 - [Limites, origem e créditos](docs/limites-e-creditos.md)
 

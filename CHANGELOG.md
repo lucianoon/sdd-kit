@@ -8,6 +8,21 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 
 ### Adicionado
 
+- Revisão escalonada por risco (FEATURE-012, AD-007). `sdd risk` calcula o tier da
+  mudança por regras declaradas (`review.tiers`, mínimo medium em `specs/`, high em
+  `specs/sdd.yaml`, severidade dos riscos da spec dona) e as aprovações humanas exigidas;
+  escalações externas só elevam o tier. `sdd findings` valida achados de revisor LLM
+  externo como evidência probabilística: bloqueia `important` aberto com consenso,
+  revisão desatualizada, achado repetido e rodada acima de `review.max_rounds`, e conta
+  destinos para medir ruído. `sdd fixes` exporta commits `SDD-Fix` como casos para
+  avaliar revisores. Nova seção `review` em `specs/sdd.yaml`; padrões não mudam nada em
+  projetos existentes.
+- `sdd adequacy` exige `reviewer_kind: human` em features com risco high ou listadas em
+  `review.human_adequacy` (AC-131). **Migração:** revisões de agente nessas features
+  passam a reprovar; registre um revisor humano.
+- `sdd guide --stage converge` orienta a convergência: sem repetir lacunas, separando o
+  pre-existente, apontando a classe do problema e parando em `review.max_rounds` (AC-132).
+
 - Exemplo RAG offline com isolamento, cache, fallback, orçamentos e traces; avaliação
   reproduzível com manifesto e comparação pareada, usando comandos e gates existentes.
 - Avaliação de complexidade e critérios de simplicidade; nenhum comando público,

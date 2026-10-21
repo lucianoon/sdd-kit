@@ -121,10 +121,27 @@ def template(root: Path, feature: str) -> Path:
     return save(root, destination, value)
 
 
+def human_required(root: Path, spec) -> list[str]:
+    """Por que esta feature exige revisor humano na adequação (vazio: não exige)."""
+    from .diff import matches
+    proj = load(root)
+    cfg = proj.config.review if proj.config else None
+    why = []
+    if cfg and matches(spec.feature, cfg.human_adequacy):
+        why.append("feature listada em review.human_adequacy")
+    if spec.design and any(r.severity == "high" for r in spec.design.risks):
+        why.append("spec com risco high")
+    return why
+
+
 def adequacy(root: Path, feature: str) -> dict:
     path, spec = selected(root, feature)
     review = read_model(root, f"specs/reviews/{slug(feature)}.yaml", Adequacy)
     problems = []
+    human = human_required(root, spec)
+    if human and review.reviewer_kind != "human":
+        problems.append("revisor humano exigido (" + "; ".join(human)
+                        + "); revisão de agente não substitui aprovação humana")
     if review.feature != feature or review.spec_sha256 != digest(confined(root, path)):
         problems.append("spec alterada ou feature divergente; revisão desatualizada")
     if not review.implementer.strip() or not review.reviewer.strip() or review.implementer.strip().casefold() == review.reviewer.strip().casefold():
@@ -143,7 +160,9 @@ def adequacy(root: Path, feature: str) -> dict:
                 problems.append(f"{item.criterion}: evidência desatualizada {ref.path}:{ref.line}")
     return {"command": "adequacy", "report_version": 1, "feature": feature, "ok": not problems,
             "scope": "integridade da revisão declarada; não executa testes nem comprova equivalência semântica",
-            "reviewer_kind": review.reviewer_kind, "problems": problems, "review": review.model_dump()}
+            "reviewer_kind": review.reviewer_kind, "human_required": human,
+            "evidence": "humana declarada" if review.reviewer_kind == "human" else "probabilística",
+            "problems": problems, "review": review.model_dump()}
 
 
 def lessons(root: Path) -> Lessons:

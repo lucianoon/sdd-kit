@@ -16,3 +16,9 @@ mutation:
   min_score: 0.9
   max_mutants: 25
   timeout: 300    # a suíte sem o NFR-001 leva ~2 min; o padrão de 120 s estoura
+review:   # revisão escalonada (AD-007): o piso vem destas regras e dos riscos das specs
+  tiers:
+    low: ["docs/**", "*.md", "README*.md"]
+    high: [".github/**", "pyproject.toml", "loopway.toml", "specs/constitution.yaml",
+           "specs/architecture.yaml", "specs/decisions.yaml", "src/sdd/procs.py"]
+  trusted_authors: [lucianoon]   # PRs do loop (loopway[bot]) exigem ao menos 1 aprovação humana
