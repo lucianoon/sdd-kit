@@ -27,6 +27,48 @@ jobs:
       # O plugin transforma cada teste que falha em anotação no PR/commit.
       - run: pip install -e ".[dev]" pytest-github-actions-annotate-failures
       # Codificação implícita vira erro: pega no Linux os bugs que só apareceriam no Windows.
+      - name: Testes
+        run: python -W error::EncodingWarning -m pytest -q --cov=sdd --cov-report=term --cov-report=json
+        env: { PYTHONWARNDEFAULTENCODING: "1" }
+      - name: Cobertura no resumo
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f coverage.json ]; then
+            echo "::warning::Relatório de cobertura ausente (coverage.json)"
+            exit 0
+          fi
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          from pathlib import Path
+          data = json.loads(Path("coverage.json").read_text(encoding="utf-8"))
+          t = data["totals"]
+          print("## Cobertura")
+          print()
+          print(f"- Cobertura: **{t['percent_covered']:.1f}%**")
+          print(f"- Linhas cobertas: {t['covered_lines']}/{t['num_statements']}")
+          print(f"- Python {os.environ.get('pythonLocation', '')} / {os.environ.get('RUNNER_OS', '')}")
+          print()
+          print("| Arquivo | Cobertura | Linhas |")
+          print("|---|---:|---:|")
+          for name, info in sorted(data.get("files", {}).items()):
+              s = info["summary"]
+              print(f"| `{name}` | {s['percent_covered']:.1f}% | {s['covered_lines']}/{s['num_statements']} |")
+          PY
+
+  # Versões mínimas declaradas em pyproject.toml, no Python mais antigo suportado.
+  test-min:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.10" }
+      - name: Instalar com versões mínimas
+        run: |
+          pip install -e ".[dev]"
+          pip install --force-reinstall "typer==0.12.0" "pydantic==2.6.0" "pyyaml==6.0"
+          python -c "import typer, pydantic, yaml; print('typer', typer.__version__); print('pydantic', pydantic.VERSION); print('pyyaml', yaml.__version__)"
       - run: python -W error::EncodingWarning -m pytest -q
         env: { PYTHONWARNDEFAULTENCODING: "1" }
 
@@ -54,7 +96,19 @@ jobs:
         run: sdd risk --base "origin/$BASE" --author "$AUTHOR"
       - if: always()
         shell: bash
-        run: cat .sdd/analyze.md .sdd/report.md .sdd/mutation.md .sdd/risk.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        run: |
+          found=0
+          for f in .sdd/analyze.md .sdd/report.md .sdd/mutation.md .sdd/risk.md; do
+            if [ -f "$f" ]; then
+              cat "$f" >> "$GITHUB_STEP_SUMMARY"
+              found=1
+            else
+              echo "::warning::Relatório ausente: $f"
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::warning::Nenhum relatório SDD foi gerado para o resumo."
+          fi
 
   # Prova de agnosticismo: o rastreio funciona com os runners reais de outras stacks.
   exemplos:

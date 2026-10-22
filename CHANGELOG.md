@@ -8,6 +8,12 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 
 ### Adicionado
 
+- Cobertura no CI (`pytest-cov`) com relatório no resumo do job; badges de CI, PyPI
+  (`sdd-kit-ai`) e licença MIT nos READMEs.
+- Job de CI com as versões mínimas das dependências de runtime, no Python 3.10.
+- GitHub Release automático ao publicar por tag `v*`, com notas extraídas da seção
+  correspondente do `CHANGELOG.md`.
+
 - Revisão escalonada por risco (FEATURE-012, AD-007). `sdd risk` calcula o tier da
   mudança por regras declaradas (`review.tiers`, mínimo medium em `specs/`, high em
   `specs/sdd.yaml`, severidade dos riscos da spec dona) e as aprovações humanas exigidas;
@@ -54,6 +60,14 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
   LGPD/PL 2338) e à instalação pelo PyPI.
 
 ### Modificado
+
+- Versão de fonte única: `__version__` lê `importlib.metadata.version("sdd-kit-ai")`;
+  o número 0.15.0 fica só no `pyproject.toml`. AC-113 passa a exigir essa fonte única
+  e o GitHub Release com notas do CHANGELOG.
+- Dependências de runtime com teto: `typer<1`, `pydantic<3`, `pyyaml<7`.
+- `README.en.md` alinhado ao conteúdo do README em português.
+- Workflow `ci` não esconde mais falhas com `|| true` / `2>/dev/null`; relatórios
+  ausentes emitem `::warning::` explícito.
 
 - O workflow gerado por `sdd init` usa `actions/checkout@v7` e `actions/setup-python@v7`,
   as mesmas versões do CI do kit.
