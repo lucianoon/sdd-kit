@@ -1,5 +1,5 @@
 feature: adocao
-version: 4
+version: 5
 size: large
 summary: Inicializar projetos, gerar specs e habilitar camadas sem sobrescrever conteúdo.
 assumptions: []
@@ -70,8 +70,10 @@ requirements:
   - id: AC-113
     given: wheel e sdist produzidos pelo projeto
     when: o smoke test de distribuição é executado
-    then: o pacote instalado expõe CLI, catálogo, análise e guia; release exige tag
-      igual à versão e sucesso da validação antes de publicar; integrações e importação
+    then: o pacote instalado expõe CLI, catálogo, análise e guia; a versão pública
+      vem de uma fonte única (metadado do pacote sdd-kit-ai); release exige tag
+      igual à versão e sucesso da validação antes de publicar, e cria GitHub Release
+      com o trecho correspondente do CHANGELOG; integrações e importação
       estão presentes no wheel; demonstração executável detecta regressão e verifica
       a correção
 design:

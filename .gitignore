@@ -1,7 +1,11 @@
+.venv/
 .sdd/
 __pycache__/
 *.egg-info/
 .pytest_cache/
+.coverage
+coverage.json
+htmlcov/
 node_modules/
 dist/
 .loopway/

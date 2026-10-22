@@ -11,10 +11,10 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Luciano Oliveira Nunes" }]
 keywords = ["sdd", "spec-driven-development", "ai-agents", "llm", "evals", "mutation-testing"]
-dependencies = ["typer>=0.12", "pydantic>=2.6", "pyyaml>=6"]
+dependencies = ["typer>=0.16,<1", "pydantic>=2.6,<3", "pyyaml>=6,<7"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "build>=1.2", "hatchling>=1.25", "pip>=23"]  # pip: smoke do wheel instalado
+dev = ["pytest>=8", "pytest-cov>=5", "build>=1.2", "hatchling>=1.25", "pip>=23"]  # pip: smoke do wheel instalado
 
 [project.scripts]
 sdd = "sdd.cli:app"

@@ -102,3 +102,8 @@ def test_ac_086_init_nunca_sobrescreve(tmp_path):
 def test_versao():
     r = run("--version")
     assert r.exit_code == 0 and r.output.strip() == f"sdd-kit {__version__}"
+
+
+def test_versao_vem_do_metadado_do_pacote():
+    from importlib.metadata import version
+    assert __version__ == version("sdd-kit-ai")

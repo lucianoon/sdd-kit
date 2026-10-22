@@ -3,6 +3,8 @@
 Português · [English](README.en.md)
 
 [![ci](https://github.com/lucianoon/sdd-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianoon/sdd-kit/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/sdd-kit-ai.svg)](https://pypi.org/project/sdd-kit-ai/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Specification-Driven Development para desenvolvimento assistido por IA, com verificação
 por ferramentas independentes.**

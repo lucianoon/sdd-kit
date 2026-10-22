@@ -40,3 +40,37 @@ jobs:
       - uses: actions/download-artifact@v8
         with: { name: dist, path: dist }
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with: { name: dist, path: dist }
+      - name: Extrair notas do CHANGELOG
+        run: |
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          tag = os.environ["GITHUB_REF_NAME"]
+          if not tag.startswith("v"):
+              raise SystemExit(f"tag inesperada: {tag}")
+          ver = tag[1:]
+          text = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          match = re.search(
+              rf"(?ms)^## \[{re.escape(ver)}\][^\n]*\n+(.*?)(?=^## |\Z)",
+              text,
+          )
+          if not match:
+              raise SystemExit(f"CHANGELOG.md sem seção [{ver}]")
+          notes = match.group(1).strip() + "\n"
+          Path("release-notes.md").write_text(notes, encoding="utf-8")
+          print(notes)
+          PY
+      - name: Criar GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --notes-file release-notes.md
