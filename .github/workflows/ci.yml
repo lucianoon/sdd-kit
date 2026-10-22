@@ -67,7 +67,8 @@ jobs:
       - name: Instalar com versões mínimas
         run: |
           pip install -e ".[dev]"
-          pip install --force-reinstall "typer==0.12.0" "pydantic==2.6.0" "pyyaml==6.0"
+          # 0.12.0 é meta-pacote; 0.12–0.15 quebram com Click 8.2+ (make_metavar / stderr).
+          pip install "typer==0.16.0" "pydantic==2.6.0" "pyyaml==6.0"
           python -c "import typer, pydantic, yaml; print('typer', typer.__version__); print('pydantic', pydantic.VERSION); print('pyyaml', yaml.__version__)"
       - run: python -W error::EncodingWarning -m pytest -q
         env: { PYTHONWARNDEFAULTENCODING: "1" }

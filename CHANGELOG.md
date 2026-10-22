@@ -64,7 +64,8 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 - Versão de fonte única: `__version__` lê `importlib.metadata.version("sdd-kit-ai")`;
   o número 0.15.0 fica só no `pyproject.toml`. AC-113 passa a exigir essa fonte única
   e o GitHub Release com notas do CHANGELOG.
-- Dependências de runtime com teto: `typer<1`, `pydantic<3`, `pyyaml<7`.
+- Dependências de runtime com teto: `typer>=0.16,<1` (0.12.0 é meta-pacote;
+  0.12–0.15 quebram com Click 8.2+), `pydantic<3`, `pyyaml<7`.
 - `README.en.md` alinhado ao conteúdo do README em português.
 - Workflow `ci` não esconde mais falhas com `|| true` / `2>/dev/null`; relatórios
   ausentes emitem `::warning::` explícito.
