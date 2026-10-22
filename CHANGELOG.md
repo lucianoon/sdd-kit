@@ -6,6 +6,8 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 
 ## [Não publicado]
 
+## [0.15.0] — 2026-10-22
+
 ### Adicionado
 
 - Cobertura no CI (`pytest-cov`) com relatório no resumo do job; badges de CI, PyPI
