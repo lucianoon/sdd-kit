@@ -28,9 +28,10 @@ evidência probabilística.
 O comando é `sdd`. O nome do pacote no `pyproject.toml` é `sdd-kit-ai`.
 
 ```bash
-pipx install git+https://github.com/lucianoon/sdd-kit    # da fonte, sempre atualizado
+pipx install sdd-kit-ai                                  # do PyPI
+pip install sdd-kit-ai                                   # do PyPI, no ambiente ativo
+pipx install git+https://github.com/lucianoon/sdd-kit    # da fonte
 uv tool install git+https://github.com/lucianoon/sdd-kit # equivalente com uv
-# pipx install sdd-kit-ai                                # do PyPI, quando publicado
 ```
 
 Python 3.10+. Funciona com qualquer linguagem cujo runner de testes gere JUnit XML
