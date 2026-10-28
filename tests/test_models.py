@@ -43,7 +43,8 @@ def test_padroes_conservadores_da_config():
 # Limites do formato YAML das specs: contrato público. Mudar um valor muda o que é uma spec
 # válida em todo projeto que adota o kit; a mudança tem que aparecer aqui, de propósito.
 LIMITES = {
-    "Alternative.name": ("min_length", 1), "ArchRule.description": ("min_length", 1),
+    "Alternative.name": ("min_length", 1), "Approval.by": ("min_length", 1), "Approval.quote": ("min_length", 1),
+    "ArchRule.description": ("min_length", 1),
     "ArchRule.sources": ("min_length", 1), "Assumption.assumption": ("min_length", 1),
     "Assumption.chosen": ("min_length", 1), "Assumption.rationale": ("min_length", 1),
     "CatalogModule.requirements": ("min_length", 1), "Config.small_max_files": ("ge", 1),

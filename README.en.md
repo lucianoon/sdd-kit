@@ -70,18 +70,35 @@ After creating the spec, prepare feature context for the agent you use:
 
 ```bash
 sdd guide create-order --stage clarify     # open questions and criteria to clarify
+sdd approve create-order --stage spec --by Ana --quote "go ahead"   # with the padrao preset
 sdd guide create-order --stage plan        # design and traceable tasks
 sdd analyze                               # diagnostics and criterion → task matrix
+sdd approve create-order --stage plan --by Ana --quote "plan ok"
 sdd guide create-order --stage implement   # context and declared task dependencies
 sdd check
 sdd guide create-order --stage converge    # instructions to review gaps after implementing
+sdd guide create-order --stage resume      # new session: declared state and next step
 ```
 
 `guide` prints instructions and context; the agent works from them. It does not call an LLM,
 change files, or run tests. `analyze` leaves sources untouched and writes static reports
 to `.sdd/analyze.json` and `.md`, including when there are errors. Both accept `--json`.
 Implementation and convergence are blocked by static errors; clarification and planning
-remain available to fix the spec. See [guided flow](docs/fluxo-guiado.md) (Portuguese).
+remain available to fix the spec. With the `approval` layer, implementation also waits for
+the user's approval, recorded in their own words with a hash of the approved content; if
+the spec changes, the approval goes stale. `sdd specify --touches pagamentos,concorrencia`
+adds implicit-requirement questions. See [guided flow](docs/fluxo-guiado.md) and
+[specification](docs/especificacao.md) (Portuguese).
+
+### Agent skill
+
+```bash
+npx skills add lucianoon/sdd-kit -g
+```
+
+The [`sdd-kit`](skills/sdd-kit/SKILL.md) skill (Portuguese) drives the conversation (ask,
+approve, resume) in Claude Code, Codex, Cursor, Copilot and other compatible agents, and
+hands all verification to `sdd`. `sdd integrate` still generates local per-stage entries.
 
 ## Adopt incrementally
 
@@ -89,7 +106,7 @@ Start at the minimum and turn layers on when they make sense:
 
 ```bash
 sdd init --preset minimo      # spec, check and diff (default)
-sdd init --preset padrao      # + design, tasks, constitution, architecture, decisions
+sdd init --preset padrao      # + design, tasks, constitution, architecture, decisions, approval
 sdd init --preset completo    # + evals, mutation, strict criterion
 
 sdd enable design tasks       # turn layers on in an existing project
@@ -141,11 +158,12 @@ do not count as a human approval. See [risk-tiered review](docs/revisao.md) (Por
 | Command | What it does |
 |---|---|
 | `sdd init` | keeps existing starter files and applies the chosen preset layers |
-| `sdd enable <layer>` | turns on design, tasks, constitution, arch, decisions, evals, mutate, strict, agentes |
-| `sdd specify <name>` | spec skeleton with unused IDs and the sections required by `--size` |
+| `sdd enable <layer>` | turns on design, tasks, constitution, arch, decisions, approval, evals, mutate, strict, agentes |
+| `sdd specify <name>` | spec skeleton with unused IDs and the sections required by `--size`; `--touches` adds implicit-requirement questions |
+| `sdd approve <feature>` | records the user's approval (spec or plan) in their words, with a hash of the content |
 | `sdd validate` | analyzes specs, tasks, constitution, profile: orphans, cycles, references, vague criteria |
 | `sdd analyze` | consolidates errors, warnings, repeated scenarios and declared traceability matrix |
-| `sdd guide <feature> --stage <stage>` | prepares context for clarify, plan, implement or converge |
+| `sdd guide <feature> --stage <stage>` | prepares context for clarify, plan, implement, converge or resume |
 | `sdd check` | runs tests, gates and architecture rules; fails a criterion without a passing test |
 | `sdd diff` | fails changed code unless the spec changed with it (with auditable exceptions) |
 | `sdd mutate` | injects faults into the code and fails if tests do not detect them |
@@ -206,8 +224,9 @@ Most of the docs below are in Portuguese.
 - [Configuration](docs/configuracao.md): every key and layer
 - [Limits, origin and credits](docs/limites-e-creditos.md)
 
-This repository checks itself with eleven specs: verification, diff, mutation, evals,
-architecture, governance, adoption, agent profile, guided flow, artifacts and complements.
+This repository checks itself with thirteen specs: verification, diff, mutation, evals,
+architecture, governance, adoption, agent profile, guided flow, artifacts, complements,
+risk-tiered review and agent conduction.
 `sdd validate` shows the current criterion count; `sdd check` runs the tests, the
 constitution and the architecture rules.
 

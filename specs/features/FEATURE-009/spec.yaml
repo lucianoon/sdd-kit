@@ -1,5 +1,5 @@
 feature: fluxo-guiado
-version: 1
+version: 2
 size: large
 summary: Análise estática de consistência e contexto por etapa para agentes, sem aprovação
   implícita.
@@ -7,6 +7,7 @@ assumptions: []
 open_questions: []
 decisions:
 - AD-005
+- AD-008
 out_of_scope:
 - Executar LLM ou gerar respostas de clarificação automaticamente
 - Provar equivalência semântica entre prosa e implementação
@@ -60,6 +61,22 @@ requirements:
       pre-existente, apontar a classe do problema, revisar só o diff novo após a primeira rodada
       e parar em review.max_rounds com o valor configurado; a verificação condicional inclui
       sdd risk e sdd findings
+  - id: AC-140
+    given: require_approval com aprovação da spec ou do plano ausente ou desatualizada
+    when: o guia é preparado
+    then: o pacote lista o estado de cada etapa de aprovação; implement fica BLOQUEADO
+      citando a etapa e sem tarefas iniciáveis; clarify, plan, converge e resume não são
+      bloqueados por aprovação
+- id: REQ-046
+  description: Retomar o trabalho de uma feature a partir do estado declarado.
+  acceptance:
+  - id: AC-141
+    given: uma feature com perguntas, aprovações e tarefas em estados variados
+    when: sdd guide roda com --stage resume
+    then: mostra perguntas sem resposta, estado das aprovações, tarefas por status e
+      iniciáveis, e o próximo passo calculado na ordem perguntas, campos PREENCHER,
+      aprovação da spec, plano, demais diagnósticos, aprovação do plano, implementação e
+      convergência; não grava arquivos nem executa comandos
 design:
   numbers:
   - metric: specs por projeto
@@ -116,6 +133,18 @@ tasks:
   - AC-098
   - AC-099
   - AC-132
+  status: done
+- id: T-25
+  title: Aprovações no guia e etapa resume com próximo passo calculado
+  origin:
+  - AC-140
+  - REQ-046
+  depends_on:
+  - T-24
+  done_when: AC-140 e AC-141 passam no check
+  evidence:
+  - AC-140
+  - AC-141
   status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.

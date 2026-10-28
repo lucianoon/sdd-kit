@@ -1,5 +1,5 @@
 feature: verificacao
-version: 3
+version: 4
 size: large
 summary: Validar contratos, ligar critérios ao JUnit e executar testes e gates.
 assumptions: []
@@ -9,6 +9,7 @@ decisions:
 - AD-002
 - AD-003
 - AD-004
+- AD-008
 out_of_scope:
 - Detecção de divergência entre prosa em Markdown e código
 - Adaptadores específicos por ferramenta (AGENTS.md cobre o MVP)
@@ -150,6 +151,18 @@ requirements:
     when: o motor ou a biblioteca é chamado
     then: preserva os imports existentes e o carregamento sem execução; check de projeto inválido retorna
       reprovação sem executar testes
+- id: REQ-045
+  description: Validar aprovações e dimensões declaradas na spec sem tratá-las como evidência.
+  acceptance:
+  - id: AC-138
+    given: specs com approvals e dimensions e a config com ou sem require_approval
+    when: o projeto é carregado
+    then: o schema rejeita etapa repetida, palavras vazias, data ou hash fora do formato e
+      dimensão desconhecida; com require_approval e size em approval_required_for, aprovação
+      ausente ou desatualizada vira aviso com etapa e estado; sem require_approval, só a
+      aprovação registrada e desatualizada avisa
+    forbidden:
+    - aprovação ausente ou desatualizada virar erro do validate
 design:
   numbers:
   - id: NFR-001
@@ -306,6 +319,14 @@ tasks:
   - AC-103
   - AC-104
   - AC-105
+  status: done
+- id: T-045
+  title: Validar aprovações e dimensões declaradas na spec.
+  origin:
+  - REQ-045
+  done_when: AC-138 passa no sdd check
+  evidence:
+  - AC-138
   status: done
 invariants:
 - Resultados se limitam às verificações executadas e ao alcance declarado.

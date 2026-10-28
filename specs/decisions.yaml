@@ -44,6 +44,19 @@ decisions:
       Tier por caminho não enxerga risco semântico, e um modelo enxerga mas varia entre
       execuções. A assimetria preserva um piso reproduzível e auditável e aproveita o modelo
       só para apertar a regra, nunca para afrouxá-la.
+  - id: AD-008
+    title: Aprovação humana registrada é condição para implementar, não evidência de pronto
+    decision: >-
+      A aprovação da spec (requisitos e escopo) e a do plano (design e tarefas) ficam na
+      própria spec, com as palavras de quem aprovou e o hash do conteúdo semântico de cada
+      etapa. Com require_approval, aprovação ausente ou desatualizada é aviso no validate e
+      bloqueia o guide na etapa implement; check, diff e mutate não a leem e continuam
+      decidindo o que está pronto.
+    rationale: >-
+      A aprovação governa quando o agente pode começar, e o hash impede que uma spec alterada
+      depois herde a aprovação anterior. O kit não autentica quem aprovou; tratá-la como
+      evidência de implementação misturaria declaração humana com execução de ferramentas
+      (AD-005).
   - id: AD-006
     title: Separar carregamento, execução e persistência protegida
     decision: >-

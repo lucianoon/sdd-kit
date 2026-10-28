@@ -111,6 +111,61 @@ decisions: [AD-001]   # decisões de projeto que a feature segue
 Decisão substituída fica no histórico com `status: superseded` e `superseded_by`; spec que
 ainda referencia uma decisão substituída não valida.
 
+### Requisitos implícitos: `dimensions`
+
+Algumas dimensões quase sempre escondem decisões que ninguém pediu em voz alta. Ao criar a
+spec, diga quais a feature toca:
+
+```bash
+sdd specify cobrar-pedido --touches pagamentos,concorrencia
+```
+
+| Dimensão | Perguntas que o catálogo acrescenta |
+|---|---|
+| `persistencia` | estado parcial em falha no meio; retenção e quem apaga |
+| `autenticacao` | quem pode e o que recebe quem não pode; credencial expirando no meio |
+| `pagamentos` | cobrança com resultado desconhecido; reembolso, estorno e parcial |
+| `chamadas-externas` | serviço lento ou fora do ar; repetir duplica efeito? |
+| `concorrencia` | duas operações sobre o mesmo registro; quem vence |
+| `transicoes-de-estado` | transições permitidas e proibidas; repetir uma transição |
+
+A spec ganha `dimensions` e as perguntas em `open_questions`, que bloqueiam o `validate` até
+serem respondidas. Sem `--touches`, o carregamento procura termos de cada dimensão no
+resumo, nos requisitos e nos critérios (sem acento e sem caixa, no início de uma palavra) e
+**avisa** quando a spec cita uma dimensão que não declara. É heurística: o aviso nunca
+bloqueia. Declare a dimensão depois de levantar as perguntas com o usuário.
+
+### Aprovação humana: `approvals`
+
+Com a camada `approval` (`require_approval: true`), a spec e o plano passam pelo usuário
+antes de o agente implementar (AD-008). O registro guarda as palavras de quem aprovou e o
+hash do conteúdo aprovado:
+
+```bash
+sdd approve criar-pedido --stage spec --by "Ana" --quote "pode seguir com essa spec"
+sdd approve criar-pedido --stage plan --by "Ana" --quote "plano ok"
+```
+
+```yaml
+approvals:
+- stage: spec
+  by: Ana
+  date: 2026-10-28
+  quote: pode seguir com essa spec
+  digest: sha256:9f2c…
+```
+
+| Etapa | O hash cobre | Pré-condição |
+|---|---|---|
+| `spec` | tudo exceto `design`, `tasks` e `approvals` | sem pergunta aberta nem campo `PREENCHER` |
+| `plan` | `design` e `tasks` (sem `status` e `evidence`) | spec aprovada e atual; spec sem erros |
+
+O hash vem do documento validado, não do texto: comentário, formatação e o avanço de
+`status`/`evidence` das tarefas não pedem nova aprovação. Mudou o conteúdo da etapa, ela fica
+`DESATUALIZADO`. Aprovação ausente ou desatualizada é **aviso** no `validate` e bloqueia só
+o `sdd guide --stage implement`; `check`, `diff` e `mutate` não a leem. O kit não autentica
+quem aprovou: a revisão do PR confere o diff da spec.
+
 ## Tarefas: `tasks`
 
 ```yaml

@@ -28,8 +28,8 @@ def _err(msg: str) -> None:
     typer.secho(f"ERRO  {msg}", fg=typer.colors.RED, err=True)
 
 
-def _warn(msg: str) -> None:
-    typer.secho(f"AVISO {msg}", fg=typer.colors.YELLOW)
+def _warn(msg: str, err: bool = False) -> None:
+    typer.secho(f"AVISO {msg}", fg=typer.colors.YELLOW, err=err)
 
 
 def _verdict(ok: bool, tail: str) -> None:
@@ -88,7 +88,7 @@ def init(
 
 @app.command()
 def enable(
-    layers: list[str] = typer.Argument(..., help="design tasks constitution arch decisions evals mutate strict agentes"),
+    layers: list[str] = typer.Argument(..., help="design tasks constitution arch decisions approval evals mutate strict agentes"),
     root: Path = Root,
 ):
     """Liga camadas num projeto existente: cria arquivos, ajusta a config e o AGENTS.md."""
@@ -108,17 +108,21 @@ def specify(
     name: str = typer.Argument(..., help="Nome da feature (minúsculas e hífen), ex.: criar-pedido."),
     size: str = typer.Option("medium", "--size", "-s", help="small | medium | large | complex"),
     acs: int = typer.Option(1, "--acs", help="Quantos critérios de aceitação gerar."),
+    touches: str = typer.Option("", "--touches", help="Dimensões de requisito implícito, separadas por "
+                                "vírgula: persistencia, autenticacao, pagamentos, chamadas-externas, "
+                                "concorrencia, transicoes-de-estado."),
     root: Path = Root,
 ):
     """Cria o esqueleto de uma spec com IDs livres e as seções que o size exige.
 
     Os campos a preencher levam o marcador PREENCHER; o `sdd validate` reprova até
-    todos serem substituídos por conteúdo real.
+    todos serem substituídos por conteúdo real. Com --touches, as perguntas de cada
+    dimensão entram em open_questions e bloqueiam o validate até serem respondidas.
     """
     from .specify import SpecifyError, create
 
     try:
-        path, ids = create(root, name, size, acs)
+        path, ids = create(root, name, size, acs, tuple(t.strip() for t in touches.split(",") if t.strip()))
     except SpecifyError as exc:
         _err(exc)
         raise typer.Exit(2)
@@ -127,10 +131,10 @@ def specify(
     typer.echo(f"\nPróximo passo: troque cada {core.PLACEHOLDER} por conteúdo real e rode `sdd validate`.")
 
 
-def _load_or_exit(root: Path) -> core.Project:
+def _load_or_exit(root: Path, as_json: bool = False) -> core.Project:
     proj = core.load(root)
     for w in proj.warnings:
-        _warn(w)
+        _warn(w, err=as_json)  # com --json, o stdout leva só o documento
     if proj.errors:
         for e in proj.errors:
             _err(e)
@@ -179,7 +183,7 @@ def analyze(
 @app.command()
 def guide(
     feature: str = typer.Argument(..., help="Nome exato da feature declarada na spec."),
-    stage: str = typer.Option("clarify", "--stage", help="clarify | plan | implement | converge"),
+    stage: str = typer.Option("clarify", "--stage", help="clarify | plan | implement | converge | resume"),
     root: Path = Root,
     as_json: bool = typer.Option(False, "--json", help="Emite contexto estruturado em JSON."),
 ):
@@ -193,6 +197,31 @@ def guide(
         raise typer.Exit(2)
     typer.echo(json.dumps(packet, indent=2, ensure_ascii=False) if as_json else render_markdown(packet))
     raise typer.Exit(1 if packet["status"] == "BLOQUEADO" else 0)
+
+
+@app.command()
+def approve(
+    feature: str = typer.Argument(..., help="Nome exato da feature declarada na spec."),
+    stage: str = typer.Option("spec", "--stage", help="spec (requisitos e escopo) | plan (design e tarefas)"),
+    by: str = typer.Option(..., "--by", help="Quem aprovou."),
+    quote: str = typer.Option(..., "--quote", help="As palavras de quem aprovou, sem paráfrase."),
+    root: Path = Root,
+):
+    """Registra na spec a aprovação humana de uma etapa, com o hash do conteúdo aprovado.
+
+    Declaração, não evidência: o kit não autentica quem aprovou, e o check continua decidindo
+    o que está pronto. Mudar o conteúdo da etapa depois deixa a aprovação desatualizada.
+    """
+    from .approvals import ApprovalError, approve as do_approve
+
+    try:
+        rel, approval = do_approve(core.load(root), feature, stage, by, quote)
+    except ApprovalError as exc:
+        _err(str(exc))
+        raise typer.Exit(2)
+    typer.echo(f"aprovado {stage} de {feature} por {approval.by} em {approval.date.isoformat()}")
+    typer.echo(f"hash     {approval.digest}")
+    typer.echo(f"gravado  {rel}")
 
 
 @app.command()
@@ -430,7 +459,7 @@ def risk_cmd(
     from .governance import risk, render_risk
     from .report import write_command_report
 
-    proj = _load_or_exit(root)
+    proj = _load_or_exit(root, as_json)
     try:
         changed, _, _ = changes(root, base)
     except GitError as exc:
@@ -467,7 +496,7 @@ def findings_cmd(
     from .governance import findings, render_findings
     from .report import write_command_report
 
-    proj = _load_or_exit(root)
+    proj = _load_or_exit(root, as_json)
     rep = findings(proj)
     write_command_report(root, "findings", rep, render_findings(rep))
     if as_json:
@@ -489,7 +518,7 @@ def fixes_cmd(
     """Exporta commits com SDD-Fix como casos para avaliar revisores (JSON)."""
     from .governance import fixes
 
-    proj = _load_or_exit(root)
+    proj = _load_or_exit(root, as_json=True)
     rep = fixes(proj, base)
     typer.echo(json.dumps(rep, ensure_ascii=False, indent=2))
     raise typer.Exit(0 if rep["ok"] else 1)

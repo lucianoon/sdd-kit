@@ -166,6 +166,20 @@ def test_ac_127_aprovacoes_e_codigos_de_saida(repo_review):
     assert invoke(root, "risk", "--base", "main", "--approvals", "-1").exit_code == 2
 
 
+def test_ac_127_json_valido_com_avisos_do_projeto(repo_review):
+    root = repo_review
+    spec = copy.deepcopy(SPEC)
+    spec["paths"] = ["src/agenda/**"]
+    spec["requirements"][1]["acceptance"][0]["then"] = "lista horários rapidamente"  # critério vago: aviso
+    project(root, spec)
+    write(root, "docs/a.md", "x\n")
+    commit(root)
+    for args in (["risk", "--base", "main", "--json"], ["findings", "--json"], ["fixes"]):
+        result = invoke(root, *args)
+        assert isinstance(json.loads(result.stdout), dict), args
+        assert "critério vago" in result.stderr and "critério vago" not in result.stdout
+
+
 @pytest.fixture
 def repo_review(tmp_path):
     git(tmp_path, "init", "-q", "-b", "main")
