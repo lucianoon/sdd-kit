@@ -160,6 +160,15 @@ def test_ac_133_plano_exige_spec_atual_e_spec_sem_erros(tmp_path):
     assert loaded(tmp_path).approvals[0].stage == "spec" and len(loaded(tmp_path).approvals) == 1
 
 
+def test_ac_133_recusa_lista_cada_problema_uma_vez(tmp_path):
+    project(tmp_path, with_tasks(copy.deepcopy(TASKS)))
+    ok(tmp_path, "spec")
+    edit(tmp_path, lambda d: d["tasks"][0].update(title="PREENCHER: unidade de trabalho"))
+    with pytest.raises(ApprovalError) as exc:
+        ok(tmp_path, "plan")
+    assert str(exc.value).count("campo ainda marcado com PREENCHER") == 1
+
+
 def test_ac_133_plano_recusa_erro_global_e_feature_ambigua(tmp_path):
     project(tmp_path, with_tasks(copy.deepcopy(TASKS)))
     ok(tmp_path, "spec")
@@ -204,6 +213,16 @@ def test_ac_134_formato_comentario_status_e_evidencia_nao_desatualizam(tmp_path)
     text = "# reformatado\n" + yaml.safe_dump(data, allow_unicode=True, default_flow_style=True, width=60)
     spec_file(tmp_path).write_text(text, encoding="utf-8")
     assert state_of(tmp_path) == {"spec": "APROVADO", "plan": "APROVADO"}
+
+
+def test_ac_134_hash_estavel_entre_versoes_do_kit():
+    # Valores fixos: um campo novo com padrão no schema não pode desatualizar aprovações antigas.
+    spec = Spec.model_validate(with_tasks(copy.deepcopy(TASKS)))
+    assert digest(spec, "spec") == "sha256:faac1aba21fdebcde9b06e33c5b28246226af26cb56627d191978de7a855bdee"
+    assert digest(spec, "plan") == "sha256:8a4c2b4e91a37db7320a036edc1a6bda237842c5bddc4dffaf27d26d324be315"
+    designed = Spec.model_validate({**BASE_SPEC, "tasks": [
+        {"id": "T-01", "title": "criar", "origin": ["REQ-001", "NFR-001"], "done_when": "teste passa"}]})
+    assert digest(designed, "plan") == "sha256:b56800ec580bf8980c1366620139d8cf39ad912f29e5d358e07da6b73d695e38"
 
 
 def test_ac_134_hash_cobre_o_conteudo_de_cada_etapa(tmp_path):
@@ -489,11 +508,18 @@ def test_ac_141_proximo_passo_segue_o_ciclo(tmp_path):
     packet = build(core.load(tmp_path), "agenda", "resume")
     assert packet["next_step"]["code"] == "CONVERGE" and packet["ready_tasks"] == []
     assert packet["tasks_by_status"]["done"] == ["T-01", "T-02", "T-03"]
-    assert "**Próximo passo (CONVERGE):** rode sdd check e sdd guide agenda --stage converge." in render_markdown(packet)
+    md = render_markdown(packet)
+    assert "**Próximo passo (CONVERGE):** rode sdd check e sdd guide agenda --stage converge." in md
+    assert "\nTarefas todo: nenhuma\nTarefas doing: nenhuma\nTarefas done: T-01, T-02, T-03\n" in md
+    assert "\n1. Releia AGENTS.md" in md and "\n4. Aprovação ausente" in md
 
 
 def test_ac_141_sem_exigencias_pula_aprovacoes_e_plano(tmp_path):
     project(tmp_path)
+    assert build(core.load(tmp_path), "agenda", "resume")["next_step"]["code"] == "CONVERGE"
+    large = copy.deepcopy(SPEC)
+    large["size"] = "large"  # design_required_for padrão inclui large, mas require_design está desligado
+    project(tmp_path, large)
     assert build(core.load(tmp_path), "agenda", "resume")["next_step"]["code"] == "CONVERGE"
     project(tmp_path, cfg={"require_design": True, "design_required_for": ["medium"]})
     assert build(core.load(tmp_path), "agenda", "resume")["next_step"]["code"] == "PLAN"

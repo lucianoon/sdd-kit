@@ -69,6 +69,33 @@ def test_ac_122_item_adequado_sem_assercao_reprova(tmp_path):
     assert problems == [f"{value['items'][0]['criterion']}: adequação pendente ou insuficiente"]
 
 
+def test_ac_100_json_so_com_flag_e_acentos_legiveis(tmp_path):
+    project(tmp_path)
+    md = invoke(tmp_path, "analyze")
+    assert md.exit_code == 0 and md.stdout.startswith("# Análise de consistência SDD")
+    guide = invoke(tmp_path, "guide", "agenda", "--json").stdout
+    assert '"status": "ORIENTAÇÃO"' in guide and guide.startswith('{\n  "')
+    change = invoke(tmp_path, "change", "propose", "ajuste", "--feature", "agenda", "--reason", "regra nova")
+    assert change.exit_code == 0 and change.stdout.startswith('{\n  "version": 1,\n  "name": "ajuste"')
+
+
+def test_ac_004_check_reprovado_sai_com_codigo_1(tmp_path):
+    project(tmp_path)
+    (tmp_path / "t/test_x.py").write_text("def test_ac_001(): pass\ndef test_ac_002(): pass\n", encoding="utf-8")
+    result = invoke(tmp_path, "check")
+    assert result.exit_code == 1 and "SEM_TESTE  AC-003" in result.stdout
+
+
+def test_ac_061_padroes_do_specify(tmp_path):
+    from sdd.specify import create
+
+    (tmp_path / "specs/features").mkdir(parents=True)
+    (tmp_path / "specs/sdd.yaml").write_text("require_design: true\n", encoding="utf-8")
+    path, ids = create(tmp_path, "pedido", "large")
+    assert ids == {"REQ": "REQ-001", "AC": "AC-001", "NFR": "NFR-001"}
+    assert path.read_text(encoding="utf-8").count("- id: AC-") == 1
+
+
 def test_ac_097_cerca_e_indentacao_do_contexto_do_guia(tmp_path):
     project(tmp_path)
     md = render_guide(build(core.load(tmp_path), "agenda", "plan"))

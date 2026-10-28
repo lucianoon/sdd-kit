@@ -56,11 +56,6 @@ def states(spec: Spec, config) -> list[dict]:
     return out
 
 
-def waiting(spec: Spec, config) -> list[dict]:
-    """Etapas exigidas sem aprovação atual: bloqueiam a implementação."""
-    return [s for s in states(spec, config) if s["required"] and s["state"] != "APROVADO"]
-
-
 def problems(rel: str, spec: Spec, config) -> list[str]:
     out = []
     for s in states(spec, config):
@@ -89,7 +84,7 @@ def _with_approval(text: str, spec: Spec, approval: Approval) -> str:
     current = re.search(r"^approvals:.*$", text, re.MULTILINE)
     if current is None:
         return text.rstrip("\n") + "\n" + block
-    nxt = _TOP_LEVEL.search(text, current.end() + 1)
+    nxt = _TOP_LEVEL.search(text, current.end())
     return text[:current.start()] + block + text[nxt.start() if nxt else len(text):]
 
 
@@ -111,10 +106,9 @@ def approve(proj, feature: str, stage: str, by: str, quote: str,
             blocking.append("o plano não tem design nem tarefas")
         if next(s for s in states(spec, proj.config) if s["stage"] == "spec")["state"] != "APROVADO":
             blocking.append("a spec não tem aprovação atual; aprove a spec antes do plano")
-        blocking += [e for e in proj.errors if (e.startswith(f"{rel}:") or not e.startswith("specs/features/"))
-                     and e not in blocking]
+        blocking += [e for e in proj.errors if e.startswith(f"{rel}:") or not e.startswith("specs/features/")]
     if blocking:
-        raise ApprovalError(f"{rel}: corrija antes de aprovar {stage}: " + "; ".join(blocking))
+        raise ApprovalError(f"{rel}: corrija antes de aprovar {stage}: " + "; ".join(dict.fromkeys(blocking)))
     approval = Approval(stage=stage, by=by, date=today or datetime.date.today(), quote=quote,
                         digest=digest(spec, stage))
     path = proj.root / rel

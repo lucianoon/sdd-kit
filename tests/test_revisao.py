@@ -178,6 +178,7 @@ def test_ac_127_json_valido_com_avisos_do_projeto(repo_review):
         result = invoke(root, *args)
         assert isinstance(json.loads(result.stdout), dict), args
         assert "critério vago" in result.stderr and "critério vago" not in result.stdout
+    assert "aprovação de agente não conta" in invoke(root, "risk", "--base", "main", "--json").stdout
 
 
 @pytest.fixture
