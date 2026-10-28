@@ -2,6 +2,8 @@ feature: mutacao
 version: 4
 size: large
 summary: Medir operadores mutados numa cópia isolada e preservar o diretório original.
+dimensions:
+- concorrencia  # execuções simultâneas preservam as cópias umas das outras (AC-088)
 assumptions:
 - assumption: linguagens alvo da mutação não foram fixadas
   chosen: operadores textuais comuns a Python e linguagens com sintaxe C, com regras léxicas por

@@ -8,10 +8,11 @@ from __future__ import annotations
 
 PRESETS = {
     "minimo": [],
-    "padrao": ["design", "tasks", "constitution", "arch", "decisions"],
-    "completo": ["design", "tasks", "constitution", "arch", "decisions", "evals", "mutate", "strict"],
+    "padrao": ["design", "tasks", "constitution", "arch", "decisions", "approval"],
+    "completo": ["design", "tasks", "constitution", "arch", "decisions", "approval", "evals", "mutate", "strict"],
 }
-LAYERS = ("design", "tasks", "constitution", "arch", "decisions", "evals", "mutate", "strict", "agentes")
+LAYERS = ("design", "tasks", "constitution", "arch", "decisions", "approval", "evals", "mutate", "strict",
+          "agentes")
 
 CONFIG = """\
 # sdd-kit. Ligue mais camadas com `sdd enable <camada>`; referência em docs/configuracao.md.
@@ -40,6 +41,11 @@ tasks_required_for: [large, complex]
     "strict": """
 # camada strict: critério vago ("rápido", "seguro") sem número vira erro
 strict_criteria: true
+""",
+    "approval": """
+# camada approval: spec e plano aprovados pelo usuário (sdd approve) antes de implementar
+require_approval: true
+approval_required_for: [medium, large, complex]
 """,
     "mutate": """
 # camada mutate: `sdd mutate` injeta falhas no código e cobra que os testes as peguem
@@ -343,6 +349,17 @@ e implemente adapters. `sdd arch` verifica. Nunca adicione `sdd: allow` sem apro
 
 Decisões ativas valem para todas as features. Conflito? Proponha uma nova decisão que
 substitua a antiga (`superseded_by`); não a ignore em silêncio.
+""",
+    "approval": """
+<!-- sdd:approval -->
+## Aprovação (`approvals`, specs medium ou maiores)
+
+Duas paradas para o usuário: a spec, depois de responder as perguntas, e o plano (design e
+tarefas). Apresente a etapa, pergunte e registre a resposta com as palavras dele:
+`sdd approve <feature> --stage spec|plan --by <nome> --quote "<palavras>"`. Nunca registre
+aprovação que o usuário não deu. Mudou o conteúdo depois? A aprovação fica desatualizada e
+`sdd guide --stage implement` bloqueia até nova aprovação. Aprovação não é evidência: quem
+decide se está pronto é o `sdd check`. Retomando o trabalho: `sdd guide <feature> --stage resume`.
 """,
     "evals": """
 <!-- sdd:evals -->

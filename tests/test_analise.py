@@ -20,6 +20,7 @@ PY = sys.executable
 
 SPEC = {
     "feature": "agenda", "version": 1, "size": "medium",
+    "dimensions": ["concorrencia"],  # AC-002: confirmações concorrentes
     "requirements": [
         {"id": "REQ-001", "description": "reservar",
          "acceptance": [{"id": "AC-001", "given": "horário livre", "when": "confirma", "then": "cria reserva"},

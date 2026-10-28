@@ -1,0 +1,139 @@
+feature: conducao-do-agente
+version: 1
+size: large
+summary: Registrar aprovações humanas ligadas ao conteúdo, levantar requisitos implícitos e
+  distribuir uma skill que conduz o agente e delega a verificação ao sdd.
+assumptions:
+- assumption: quem registra a aprovação é o próprio usuário ou o agente com as palavras dele
+  chosen: o kit grava autor e palavras declarados, sem autenticar a identidade
+  rationale: autenticação exige um serviço externo; a revisão do PR e o histórico do Git
+    continuam conferindo quem aprovou
+- assumption: palavras que indicam uma dimensão de requisito implícito
+  chosen: catálogo fixo de radicais em português e inglês, comparados sem acento e sem caixa
+  rationale: heurística determinística e auditável; o aviso pede declaração, não bloqueia
+open_questions: []
+decisions:
+- AD-005
+- AD-008
+out_of_scope:
+- Autenticar a identidade de quem aprovou
+- Executar LLM para conduzir a conversa ou responder perguntas
+- Inferir dimensões por análise semântica do texto
+requirements:
+- id: REQ-042
+  description: Registrar a aprovação humana da spec e do plano, vinculada ao conteúdo
+    aprovado.
+  acceptance:
+  - id: AC-133
+    given: uma spec e as palavras de quem aprovou
+    when: sdd approve grava a etapa spec ou plan
+    then: registra etapa, autor, data, palavras e o hash sha256 do conteúdo semântico da
+      etapa, preserva os comentários fora de approvals e substitui só a aprovação anterior
+      da mesma etapa; feature inexistente, palavras vazias, spec com pergunta sem resposta
+      ou campo PREENCHER, plano sem design nem tarefas, plano com erros na spec ou plano
+      sem aprovação atual da spec saem com código 2 sem alterar o arquivo
+    forbidden:
+    - gravar aprovação com palavras vazias
+    - aprovar o plano sem aprovação atual da spec
+  - id: AC-134
+    given: uma aprovação registrada
+    when: o conteúdo da etapa muda depois dela
+    then: a etapa fica DESATUALIZADA; a spec cobre tudo exceto design, tasks e approvals,
+      e o plano cobre design e tarefas; reformatação, comentários, status e evidence de
+      tarefas mantêm a etapa APROVADA; etapa sem registro fica AUSENTE
+- id: REQ-043
+  description: Levantar dimensões de requisito implícito antes de a spec ser aprovada.
+  acceptance:
+  - id: AC-135
+    given: o catálogo de seis dimensões de requisito implícito, cada uma com suas
+      perguntas
+    when: sdd specify recebe --touches com uma ou mais delas
+    then: a spec gerada declara as dimensões e traz as perguntas do catálogo em
+      open_questions, que bloqueiam o validate até serem respondidas; dimensão
+      desconhecida sai com código 2 sem criar arquivos
+  - id: AC-136
+    given: uma spec cujo resumo, requisitos ou critérios citam termos de uma dimensão
+    when: o projeto é carregado
+    then: avisa a dimensão e os termos encontrados quando ela não está em dimensions;
+      declarada, não avisa; termos com acento ou maiúscula são reconhecidos e o termo
+      dentro de outra palavra não
+- id: REQ-044
+  description: Distribuir uma skill que conduz a conversa e delega a verificação ao sdd.
+  acceptance:
+  - id: AC-137
+    given: o arquivo skills/sdd-kit/SKILL.md do repositório
+    when: a skill é lida
+    then: o frontmatter tem name sdd-kit e description; todo comando sdd citado existe
+      na CLI; as instruções proíbem registrar aprovação que o usuário não deu e dizem
+      que pronto é decidido por sdd check
+design:
+  numbers:
+  - metric: specs por projeto
+    max: 500
+    unit: arquivos
+    source: estimativa do autor
+  data_flow:
+    ingress:
+    - via: arquivos YAML e argumentos de CLI
+      source: specs, config e palavras de quem aprovou
+      frequency: por chamada
+    egress:
+    - to: spec com a aprovação registrada, avisos e contexto para o agente
+      consumers:
+      - CLI
+      - agente
+      - revisão do PR
+      freshness: estado atual dos arquivos
+  alternatives:
+  - name: aprovação na spec com hash do conteúdo semântico
+    chosen: true
+    why: fica versionada junto do que foi aprovado e invalida sozinha quando o conteúdo muda
+  - name: aprovação em arquivo separado ou só na conversa
+    why_not: separa a aprovação do conteúdo e se perde em compactação ou troca de sessão
+  risks:
+  - area: data_integrity
+    severity: medium
+    description: spec alterada depois da aprovação parecer aprovada
+    mitigated_by:
+    - AC-134
+  - area: compliance
+    severity: medium
+    description: agente registrar aprovação que o usuário não deu
+    accepted: o kit não autentica identidade; a skill proíbe, e o diff da spec fica na
+      revisão humana do PR
+  dependencies: []
+tasks:
+- id: T-01
+  title: Calcular o hash semântico, o estado e o registro das aprovações
+  origin:
+  - REQ-042
+  done_when: AC-133 e AC-134 passam no check
+  evidence:
+  - AC-133
+  - AC-134
+  status: done
+- id: T-02
+  title: Catálogo de dimensões, perguntas no specify e aviso no carregamento
+  origin:
+  - REQ-043
+  done_when: AC-135 e AC-136 passam no check
+  evidence:
+  - AC-135
+  - AC-136
+  status: done
+- id: T-03
+  title: Skill sdd-kit distribuível pelo repositório
+  origin:
+  - REQ-044
+  done_when: AC-137 passa no check
+  evidence:
+  - AC-137
+  status: done
+invariants:
+- Resultados se limitam às verificações executadas e ao alcance declarado.
+- Aprovação registrada não conta como evidência de implementação.
+quality_gates:
+- compila
+paths:
+- src/sdd/approvals.py
+- src/sdd/dimensions.py

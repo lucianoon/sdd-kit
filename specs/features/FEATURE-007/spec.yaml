@@ -1,5 +1,5 @@
 feature: adocao
-version: 5
+version: 6
 size: large
 summary: Inicializar projetos, gerar specs e habilitar camadas sem sobrescrever conteúdo.
 assumptions: []
@@ -9,6 +9,7 @@ decisions:
 - AD-002
 - AD-003
 - AD-004
+- AD-008
 out_of_scope:
 - Detecção de divergência entre prosa em Markdown e código
 - Adaptadores específicos por ferramenta (AGENTS.md cobre o MVP)
@@ -56,6 +57,12 @@ requirements:
     given: arquivos já existentes
     when: sdd init roda
     then: nenhum arquivo existente é alterado
+  - id: AC-139
+    given: sdd init com preset padrao ou completo, ou sdd enable approval
+    when: a camada approval é aplicada
+    then: a config ganha require_approval e approval_required_for, o AGENTS.md ganha a seção
+      approval com sdd approve e a proibição de registrar aprovação não dada, e o projeto
+      valida; o preset minimo não liga a camada
 - id: REQ-025
   description: Expor análise e fluxo guiado na CLI e instruções de adoção.
   acceptance:
@@ -136,6 +143,14 @@ tasks:
   - AC-084
   - AC-085
   - AC-086
+  status: done
+- id: T-139
+  title: Camada approval nos presets, no enable e no AGENTS.md
+  origin:
+  - AC-139
+  done_when: AC-139 passa no sdd check
+  evidence:
+  - AC-139
   status: done
 - id: T-25
   title: Integrar análise e guia à CLI e adoção

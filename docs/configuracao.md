@@ -24,6 +24,8 @@ design_required_for: [large, complex]
 require_tasks: false       # camada tasks
 tasks_required_for: [large, complex]
 strict_criteria: false     # camada strict: critério vago vira erro
+require_approval: false    # camada approval: spec e plano aprovados antes de implementar
+approval_required_for: [medium, large, complex]
 
 mutation:                  # camada mutate
   command: null            # padrão: tests.command (dica: algo que falhe rápido, ex. pytest -x)
@@ -70,13 +72,14 @@ A gravação de artefatos recusa links e usa substituição atômica. Veja
 | `constitution` | `specs/constitution.yaml` + seção | princípios com cobrança explícita |
 | `arch` | `specs/architecture.yaml` + seção | regras de dependência entre camadas |
 | `decisions` | `specs/decisions.yaml` + seção | decisões de projeto (AD-NNN) |
+| `approval` | `require_approval` + seção | spec e plano aprovados pelo usuário (`sdd approve`) antes de implementar |
 | `evals` | bloco `evals` + seção | comportamento de LLM com critério estatístico |
 | `mutate` | bloco `mutation`, passo no CI + seção | força dos testes |
 | `strict` | `strict_criteria: true` | critério vago reprova |
 | `agentes` | `specs/agents.yaml` + seção | perfil de agentes (61 requisitos, módulo LGPD) |
 
 Presets do `sdd init`: `minimo` (nenhuma camada), `padrao` (design, tasks, constitution,
-arch, decisions) e `completo` (padrao + evals, mutate, strict).
+arch, decisions, approval) e `completo` (padrao + evals, mutate, strict).
 
 ## Arquivos em `specs/`
 

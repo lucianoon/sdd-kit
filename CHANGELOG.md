@@ -6,6 +6,35 @@ observável; mudanças que quebram projetos que adotam o kit explicam a migraç�
 
 ## [Não publicado]
 
+### Adicionado
+
+- Aprovação humana registrada (FEATURE-013, AD-008). `sdd approve <feature> --stage
+  spec|plan --by <nome> --quote "<palavras>"` grava na spec as palavras de quem aprovou e o
+  hash sha256 do conteúdo semântico da etapa: a spec (tudo exceto design, tarefas e
+  aprovações) e o plano (design e tarefas, sem `status` e `evidence`). Mudou o conteúdo,
+  a etapa fica `DESATUALIZADO`. Nova camada `approval` (`require_approval`,
+  `approval_required_for`), ligada nos presets `padrao` e `completo`: aprovação ausente ou
+  desatualizada é aviso no `validate` e bloqueia `sdd guide --stage implement`. `check`,
+  `diff` e `mutate` não a leem.
+- Dimensões de requisito implícito: `sdd specify --touches` (persistencia, autenticacao,
+  pagamentos, chamadas-externas, concorrencia, transicoes-de-estado) declara `dimensions`
+  e acrescenta as perguntas do catálogo em `open_questions`. O carregamento avisa quando a
+  spec cita termos de uma dimensão que não declara.
+- `sdd guide --stage resume`: perguntas sem resposta, aprovações, tarefas por status e o
+  próximo passo calculado (`next_step`, também nas demais etapas) para retomar uma sessão.
+- Skill `skills/sdd-kit/SKILL.md`, instalável com `npx skills add lucianoon/sdd-kit`.
+
+### Corrigido
+
+- `sdd risk --json`, `sdd findings --json` e `sdd fixes` imprimiam avisos do projeto no
+  stdout antes do JSON; os avisos vão para o stderr.
+
+### Migração
+
+- `sdd integrate` gera também a entrada da etapa `resume` (15 arquivos com `all`).
+- Projetos existentes não mudam: `require_approval` é `false` por padrão. Specs que citam
+  termos de uma dimensão recebem aviso até declará-la em `dimensions`.
+
 ## [0.15.0] — 2026-10-22
 
 ### Adicionado

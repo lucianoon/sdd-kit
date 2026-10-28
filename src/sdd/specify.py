@@ -6,6 +6,7 @@ pronta. Quem preenche (pessoa ou agente) troca cada marcador por conteúdo real.
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -13,6 +14,7 @@ import yaml
 
 from .project import CONFIG_PATH, PLACEHOLDER
 from .artifacts import atomic_write, confined, load_yaml
+from .dimensions import questions
 
 ID_ANY = re.compile(r"\b(REQ|AC|NFR|EVAL)-(\d{3,})\b")
 NAME_OK = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -66,9 +68,14 @@ def _design_required(root: Path, size: str) -> bool:
 
 
 def render(name: str, size: str, acs: int, ids: dict[str, int], with_design: bool,
-           with_limits: bool = False, with_tasks: bool = False) -> str:
+           with_limits: bool = False, with_tasks: bool = False, touches: tuple[str, ...] = ()) -> str:
     def nid(kind: str, offset: int = 1) -> str:
         return f"{kind}-{ids[kind] + offset:03d}"
+
+    # JSON é YAML válido: aspas e acentos das perguntas do catálogo saem sem escape manual.
+    asked = "".join(f"\n  - question: {json.dumps(q, ensure_ascii=False)}" for q in questions(list(touches)))
+    open_questions = asked if touches else " []"
+    dimensions = f"dimensions: [{', '.join(touches)}]\n" if touches else ""
 
     ac_lines = "\n".join(
         f"      - id: {nid('AC', i)}\n"
@@ -84,7 +91,7 @@ summary: "{P}: o problema que esta feature resolve, em uma frase"
 out_of_scope:
   - "{P}: o que explicitamente NÃO será feito (ou remova a lista)"
 assumptions: []
-open_questions: []
+{dimensions}open_questions:{open_questions}
 decisions: []
 
 requirements:
@@ -148,13 +155,19 @@ paths:
     return out
 
 
-def create(root: Path, name: str, size: str = "medium", acs: int = 1) -> tuple[Path, dict[str, str]]:
+def create(root: Path, name: str, size: str = "medium", acs: int = 1,
+           touches: tuple[str, ...] = ()) -> tuple[Path, dict[str, str]]:
     if not NAME_OK.match(name):
         raise SpecifyError(f"nome inválido '{name}': use minúsculas, dígitos e hífen (ex.: criar-pedido)")
     if size not in ("small", "medium", "large", "complex"):
         raise SpecifyError(f"size inválido '{size}': small | medium | large | complex")
     if acs < 1:
         raise SpecifyError("--acs precisa ser pelo menos 1")
+    touches = tuple(dict.fromkeys(touches))
+    try:
+        questions(list(touches))
+    except ValueError as exc:
+        raise SpecifyError(str(exc)) from exc
     try:
         ids, features, last_dir = _existing(root)
     except (OSError, UnicodeError) as exc:
@@ -168,7 +181,8 @@ def create(root: Path, name: str, size: str = "medium", acs: int = 1) -> tuple[P
     folder.mkdir(parents=True)
     path = folder / "spec.yaml"
     with_limits = with_design and (root / "specs/agents.yaml").exists()
-    atomic_write(root, path.relative_to(root).as_posix(), render(name, size, acs, ids, with_design, with_limits, with_tasks))
+    atomic_write(root, path.relative_to(root).as_posix(),
+                 render(name, size, acs, ids, with_design, with_limits, with_tasks, touches))
     allocated = {"REQ": f"REQ-{ids['REQ'] + 1:03d}",
                  "AC": ", ".join(f"AC-{ids['AC'] + i:03d}" for i in range(1, acs + 1))}
     if with_design:

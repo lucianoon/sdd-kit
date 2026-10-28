@@ -25,6 +25,8 @@ rules:
       - src/sdd/changes.py
       - src/sdd/adapters.py
       - src/sdd/governance.py
+      - src/sdd/approvals.py
+      - src/sdd/dimensions.py
     forbid: [typer, click]
     forbid_paths: [src/sdd/cli]
   - id: ARCH-002

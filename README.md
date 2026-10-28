@@ -71,18 +71,35 @@ Depois de criar a spec, prepare o contexto da feature para o agente de sua escol
 
 ```bash
 sdd guide criar-pedido --stage clarify     # perguntas abertas e critérios a esclarecer
+sdd approve criar-pedido --stage spec --by Ana --quote "pode seguir"   # com o preset padrao
 sdd guide criar-pedido --stage plan        # design e tarefas rastreáveis
 sdd analyze                               # diagnósticos e matriz critério → tarefas
+sdd approve criar-pedido --stage plan --by Ana --quote "plano ok"
 sdd guide criar-pedido --stage implement   # contexto e dependências declaradas das tarefas
 sdd check
 sdd guide criar-pedido --stage converge    # instruções para revisar lacunas após implementar
+sdd guide criar-pedido --stage resume      # sessão nova: estado declarado e próximo passo
 ```
 
 O `guide` imprime instruções e contexto; o agente trabalha sobre eles. Não chama LLM,
 não altera arquivos nem executa testes. `analyze` preserva as fontes e grava relatórios
 estáticos em `.sdd/analyze.json` e `.md`, inclusive quando há erros. Ambos aceitam `--json`.
 Implementação e convergência ficam bloqueadas por erros estáticos; clarificação e plano
-continuam disponíveis para corrigir a spec. Veja [fluxo guiado](docs/fluxo-guiado.md).
+continuam disponíveis para corrigir a spec. Com a camada `approval`, a implementação também
+espera a aprovação do usuário, registrada com as palavras dele e o hash do conteúdo
+aprovado; mudou a spec, a aprovação fica desatualizada. `sdd specify --touches
+pagamentos,concorrencia` traz as perguntas de requisitos implícitos. Veja
+[fluxo guiado](docs/fluxo-guiado.md) e [especificação](docs/especificacao.md).
+
+### Skill para o agente
+
+```bash
+npx skills add lucianoon/sdd-kit -g
+```
+
+A skill [`sdd-kit`](skills/sdd-kit/SKILL.md) conduz a conversa (perguntar, aprovar, retomar)
+em Claude Code, Codex, Cursor, Copilot e outros agentes compatíveis, e delega toda
+verificação ao `sdd`. `sdd integrate` continua gerando entradas locais por etapa.
 
 ## Adote aos poucos
 
@@ -90,7 +107,7 @@ Comece no mínimo e ligue camadas quando fizerem sentido:
 
 ```bash
 sdd init --preset minimo      # spec, check e diff (padrão)
-sdd init --preset padrao      # + design, tarefas, constituição, arquitetura, decisões
+sdd init --preset padrao      # + design, tarefas, constituição, arquitetura, decisões, aprovação
 sdd init --preset completo    # + evals, mutação, critério estrito
 
 sdd enable design tasks       # liga camadas num projeto existente
@@ -142,11 +159,12 @@ não contam como aprovação humana. Veja [revisão escalonada](docs/revisao.md)
 | Comando | O que faz |
 |---|---|
 | `sdd init` | preserva arquivos iniciais existentes e aplica as camadas do preset escolhido |
-| `sdd enable <camada>` | liga design, tasks, constitution, arch, decisions, evals, mutate, strict, agentes |
-| `sdd specify <nome>` | esqueleto de spec com IDs livres e as seções que o `--size` exige |
+| `sdd enable <camada>` | liga design, tasks, constitution, arch, decisions, approval, evals, mutate, strict, agentes |
+| `sdd specify <nome>` | esqueleto de spec com IDs livres e as seções que o `--size` exige; `--touches` traz perguntas de requisitos implícitos |
+| `sdd approve <feature>` | registra a aprovação do usuário (spec ou plano) com as palavras dele e o hash do conteúdo |
 | `sdd validate` | analisa specs, tarefas, constituição, perfil: órfãos, ciclos, referências, critério vago |
 | `sdd analyze` | consolida erros, avisos, cenários repetidos e matriz de rastreabilidade declarada |
-| `sdd guide <feature> --stage <etapa>` | prepara contexto para clarify, plan, implement ou converge |
+| `sdd guide <feature> --stage <etapa>` | prepara contexto para clarify, plan, implement, converge ou resume |
 | `sdd check` | roda testes, gates e regras de arquitetura; reprova critério sem teste passando |
 | `sdd diff` | reprova código alterado sem a spec mudar junto (com exceções auditáveis) |
 | `sdd mutate` | injeta falhas no código e reprova se os testes não as detectam |
@@ -203,8 +221,9 @@ Veja também a [avaliação de complexidade e regra de simplicidade](docs/simpli
 - [Configuração](docs/configuracao.md): todas as chaves e camadas
 - [Limites, origem e créditos](docs/limites-e-creditos.md)
 
-Este repositório verifica a si mesmo com onze specs: verificação, diff, mutação, evals,
-arquitetura, governança, adoção, perfil de agentes, fluxo guiado, artefatos e complementos. `sdd validate` mostra a contagem
+Este repositório verifica a si mesmo com treze specs: verificação, diff, mutação, evals,
+arquitetura, governança, adoção, perfil de agentes, fluxo guiado, artefatos, complementos,
+revisão escalonada e condução do agente. `sdd validate` mostra a contagem
 atual de critérios; `sdd check` roda os testes, a constituição e as regras de arquitetura.
 
 Os relatórios JSON e Markdown identificam a versão do kit, o formato e o comando.

@@ -175,8 +175,10 @@ def _load_constitution(proj: Project) -> None:
 
 
 def _analyze(proj: Project) -> None:
-    """Tarefas (origem, dependências, cobertura) e critérios vagos."""
+    """Tarefas (origem, dependências, cobertura), critérios vagos, aprovações e dimensões."""
     from .analysis import check_criteria, check_tasks
+    from .approvals import problems as approval_problems
+    from .dimensions import check as check_dimensions
 
     global_ids = {r.id for r in proj.arch}
     if proj.constitution:
@@ -191,6 +193,8 @@ def _analyze(proj: Project) -> None:
             proj.errors += vague
         else:
             proj.warnings += vague
+        # Aprovação é condição para implementar (AD-008), não validade do contrato: só avisa.
+        proj.warnings += approval_problems(rel, spec, cfg) + check_dimensions(rel, spec)
 
 
 def _placeholders(rel: str, text: str) -> list[str]:

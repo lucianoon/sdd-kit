@@ -42,6 +42,7 @@ sdd guide criar-pedido --stage clarify
 sdd guide criar-pedido --stage plan
 sdd guide criar-pedido --stage implement
 sdd guide criar-pedido --stage converge
+sdd guide criar-pedido --stage resume
 sdd guide criar-pedido --stage plan --json
 ```
 
@@ -58,6 +59,7 @@ contexto antes de compartilhá-lo com um serviço externo.
 | `plan` | Elaborar design e tarefas com origem, dependências e critério de conclusão |
 | `implement` | Implementar dentro do escopo, derivar testes dos critérios e executar verificação |
 | `converge` | Inspecionar lacunas missing, partial, contradicts e unrequested; propor tarefas adicionais |
+| `resume` | Retomar uma sessão: reconciliar o estado declarado com o Git e seguir o próximo passo |
 
 `guide` somente imprime o contexto: não lê relatórios antigos para declarar sucesso,
 não escreve arquivos nem inicia agente, shell ou LLM. É necessário entregar o contexto
@@ -69,10 +71,38 @@ Erros estáticos em qualquer parte do projeto produzem `BLOQUEADO` e código 1 p
 contexto para reparar as declarações existentes. Spec que não pôde ser carregada, nome
 ambíguo, feature inexistente ou etapa desconhecida retornam código 2.
 
+Com `require_approval`, aprovação de spec ou plano ausente ou desatualizada também produz
+`BLOQUEADO` em `implement`, com a etapa listada em `blockers`. As demais etapas mostram o
+estado das aprovações em `approvals` sem bloquear: é nelas que a spec e o plano são
+corrigidos e apresentados. Veja [aprovação humana](especificacao.md#aprovação-humana-approvals).
+
 `ready_tasks` lista tarefas todo/doing cujas dependências estão declaradas como done;
-se houver erros estáticos, a lista fica vazia. Essa lista não executa tarefas e não
+se houver erros estáticos ou aprovação exigida pendente, a lista fica vazia. Essa lista não executa tarefas e não
 comprova as evidências de suas dependências. Não há sugestão de paralelismo por arquivos
 disjuntos: o schema atual não declara paths por tarefa.
+
+## Retomar o trabalho
+
+Uma sessão nova, ou uma conversa compactada, guarda a tarefa e perde as regras e o estado.
+`sdd guide <feature> --stage resume` reconstrói o estado a partir dos arquivos: perguntas
+sem resposta (`pending_questions`), aprovações, tarefas por status (`tasks_by_status`),
+tarefas iniciáveis e o próximo passo (`next_step`), calculado nesta ordem:
+
+| Código | Quando |
+|---|---|
+| `ANSWER_QUESTIONS` | há pergunta aberta sem resposta |
+| `FILL_PLACEHOLDERS` | a spec ainda tem campo `PREENCHER` |
+| `APPROVE_SPEC` | aprovação da spec exigida e ausente ou desatualizada |
+| `PLAN` | design ou tarefas exigidos pelo size e ainda ausentes |
+| `FIX_DIAGNOSTICS` | restam erros estáticos no projeto |
+| `APPROVE_PLAN` | aprovação do plano exigida e ausente ou desatualizada |
+| `IMPLEMENT` | há tarefa iniciável |
+| `CONVERGE` | nada acima: rodar `sdd check` e a convergência |
+
+O guia não lê o Git. As instruções da etapa pedem ao agente que reconcilie o estado
+declarado com `git status` e `git log` antes de agir (vale o repositório) e que, em sessão
+nova, proponha o próximo passo ao usuário antes de alterar código. `next_step` também vem
+nas outras etapas.
 
 ## Convergência e aprovação
 

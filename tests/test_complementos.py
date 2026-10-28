@@ -39,7 +39,7 @@ def review(root):
 
 def test_ac_121_integracoes_idempotentes_e_customizacao_preservada(tmp_path):
     outputs = install(tmp_path, "all")
-    assert len(outputs) == 12
+    assert len(outputs) == 15  # 3 agentes x 5 etapas do guide
     assert outputs == install(tmp_path, "all")
     for name in outputs:
         text = (tmp_path / name).read_text(encoding="utf-8")

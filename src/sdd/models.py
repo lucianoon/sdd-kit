@@ -1,6 +1,7 @@
 """Schema canônico das especificações. Fonte única: daqui sai o JSON Schema."""
 from __future__ import annotations
 
+import datetime
 from typing import Annotated, Literal
 from pathlib import PurePosixPath, PureWindowsPath
 
@@ -347,6 +348,27 @@ class DecisionLog(Strict):
     decisions: list[Decision] = []
 
 
+# Dimensões de requisito implícito; o catálogo de perguntas e termos fica em dimensions.py.
+Dimension = Literal["persistencia", "autenticacao", "pagamentos", "chamadas-externas",
+                    "concorrencia", "transicoes-de-estado"]
+ApprovalStage = Literal["spec", "plan"]
+
+
+class Approval(Strict):
+    """Aprovação humana de uma etapa (AD-008). Declaração, não evidência: `by` não é autenticado."""
+    stage: ApprovalStage
+    by: str = Field(min_length=1)
+    date: datetime.date
+    quote: str = Field(min_length=1)  # as palavras de quem aprovou, sem paráfrase
+    digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")  # conteúdo semântico aprovado
+
+    @model_validator(mode="after")
+    def _palavras(self):
+        if not self.by.strip() or not self.quote.strip():
+            raise ValueError("aprovação precisa de `by` e de `quote` com as palavras de quem aprovou")
+        return self
+
+
 # --- Spec e config ------------------------------------------------------------
 
 # --- Tarefas e constituição -------------------------------------------------------
@@ -412,6 +434,15 @@ class Spec(Strict):
     quality_gates: list[str] = []
     # Código que pertence a esta feature (globs com **). Usado por `sdd diff`.
     paths: list[str] = []
+    dimensions: list[Dimension] = []  # dimensões de requisito implícito já levantadas
+    approvals: list[Approval] = []  # gravadas por `sdd approve`, uma por etapa
+
+    @model_validator(mode="after")
+    def _uma_aprovacao_por_etapa(self):
+        stages = [a.stage for a in self.approvals]
+        for stage in sorted({s for s in stages if stages.count(s) > 1}):
+            raise ValueError(f"etapa de aprovação repetida: {stage}")
+        return self
 
     def criteria(self) -> list[tuple[str, str, str]]:
         """(id, origem, descrição) de tudo que exige evidência de teste."""
@@ -447,6 +478,10 @@ class Config(Strict):
     tasks_required_for: list[Size] = ["large", "complex"]
     # Critério vago ("rápido", "seguro", "corretamente") sem valor observável: aviso, ou erro se true.
     strict_criteria: bool = False
+    # Aprovação humana da spec e do plano (AD-008): ausente ou desatualizada vira aviso e
+    # bloqueia o `sdd guide --stage implement` nas specs com size em approval_required_for.
+    require_approval: bool = False
+    approval_required_for: list[Size] = ["medium", "large", "complex"]
     # Feature `small` que altera mais arquivos de código que isto reprova o `sdd diff`.
     small_max_files: int = Field(3, ge=1)
     mutation: MutationConfig = Field(default_factory=lambda: MutationConfig())
